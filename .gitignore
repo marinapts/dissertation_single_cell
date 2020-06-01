@@ -2,3 +2,6 @@ sftp-config.json
 data/
 plots/
 .env/
+old_plots/
+preprocessing/plots_hom/
+preprocessing/plots_het/

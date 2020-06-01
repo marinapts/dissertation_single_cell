@@ -3,128 +3,162 @@ library(Seurat)
 library(patchwork)
 library(ggplot2)
 library(gridExtra)
+library(optparse)
+library(cowplot)
 
 
-load_dataset <- function(file, name) {
-    gene_expression_matrix <- read.csv(file, row.names=1)  # Load csv file
-    seuratObj <- CreateSeuratObject(counts=gene_expression_matrix, project=name)  # Create Seurat object
+load_dataset = function(file, name) {
+    gene_expression_matrix = read.csv(file, row.names=1)  # Load csv file
+    seuratObj = CreateSeuratObject(counts=gene_expression_matrix, project=name)  # Create Seurat object
     print(cat(name, dim(seuratObj)))
     return(seuratObj)
 }
 
-qc_plots <- function(data, name) {
+quality_control_plots = function(data, name) {
     # Add percentage of mitochondrial genes to the Seurat object
-    data[['percent.mito']] <- PercentageFeatureSet(data, pattern = '^MT-')
+    data[['percent.mt']] = PercentageFeatureSet(data, pattern = '^mt-')
+
     # Visualize QC metrics as a violin plot
-    violin_plot <- VlnPlot(data, features = c('nFeature_RNA', 'nCount_RNA', 'percent.mito'), ncol = 3)
+    violin_plot = VlnPlot(data, features = c('nFeature_RNA', 'nCount_RNA', 'percent.mt'), ncol = 3)
     # Visualize relationship between nCount_RNA and nFeature_RNA
-    scatter_plot <- FeatureScatter(data, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA')
-    return(list(violin_plot, scatter_plot))
-    # while (!is.null(dev.list()))  dev.off()
+    scatter_plot_1 = FeatureScatter(data, feature1 = 'nCount_RNA', feature2 = 'percent.mt')
+    scatter_plot_2 = FeatureScatter(data, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA')
+    scatter_plot = scatter_plot_1 + scatter_plot_2
+
+    ggsave(file=paste0(plots_dir, name, '_qc_violin.pdf'), plot=violin_plot, height=30, width=20, units='cm')
+    ggsave(file=paste0(plots_dir, name, '_qc_scatter.pdf'), plot=scatter_plot, height=20, width=30, units='cm')
+
+    return(data)
 }
 
-feature_selection <- function(data) {
-    data <- FindVariableFeatures(data, selection.method = 'vst', nfeatures = 2000)
+feature_selection = function(data, name) {
+    data = FindVariableFeatures(data, selection.method = 'vst', nfeatures = 2000)
 
     # Identify the 10 most highly variable genes
-    top10 <- head(VariableFeatures(data), 10)
+    top10 = head(VariableFeatures(data), 10)
 
     # plot variable features with and without labels
-    plot1 <- VariableFeaturePlot(data)
-    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-    plot1 + plot2
+    plot1 = VariableFeaturePlot(data)
+    plot2 = LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    feature_selection_plot = plot1 + plot2
+    ggsave(file=paste0(plots_dir, name, '_feature_selection.pdf'), plot=feature_selection_plot, height=30, width=35, units='cm')
     return(data)
 }
 
-scaling <- function(data) {
-    all.genes <- rownames(data)
-    data <- ScaleData(data, features = all.genes)
+scaling = function(data) {
+    all.genes = rownames(data)
+    data = ScaleData(data, features = all.genes)
     return(data)
 }
 
-umap_clustering <- function(data, rds_name, dimensions) {
-    data <- FindNeighbors(data, dims = 1:dimensions)
-    data <- FindClusters(data, resolution = 0.5)
+plot_first_pc_directions = function(E13, E14, name) {
+    pca_13 = plot(DimPlot(E13, reduction = 'pca'))
+    pca_14 = plot(DimPlot(E14, reduction = 'pca'))
+    pca_plots = pca_13 + pca_14
+    ggsave(file=paste0(plots_dir, name, '_pca.pdf'), plot=pca_plots, width=30, units='cm')
+}
+
+plot_heatmap = function(E13, E14, name) {
+    heatmap_13 = plot(DimHeatmap(E13, dims = 1, cells = 500, balanced = TRUE))
+    heatmap_14 = plot(DimHeatmap(E14, dims = 1, cells = 500, balanced = TRUE))
+    heatmap = heatmap_13 + heatmap_14
+    ggsave(file=paste0(plots_dir, name, '_heatmap.pdf'), plot=heatmap, width=30, units='cm')
+}
+
+elbow_plot = function(E13, E14, name, dimensions) {
+    elbow_13 = ElbowPlot(E13, ndims=dimensions)
+    elbow_14 = ElbowPlot(E13, ndims=dimensions)
+    elbow = elbow_13 + elbow_14
+    ggsave(file=paste0(plots_dir, name, '_elbow.pdf'), plot=elbow, width=30, units='cm')
+}
+
+run_umap = function(data, dimensions) {
+    data = FindNeighbors(data, dims = 1:dimensions)
+    data = FindClusters(data, resolution = 0.5)
     # Look at cluster IDs of the first 5 cells
-    head(Idents(data), 5)
-    data <- RunUMAP(data, dims = 1:dimensions)
-    umap_plot <- DimPlot(data, reduction = 'umap', label = TRUE)
-    saveRDS(data, file = paste0('../plots/umap_', rds_name, '.rds'))
-    return(umap_plot)
+    # head(Idents(data), 5)
+    data = RunUMAP(data, dims = 1:dimensions)
+    return(data)
 }
 
+plot_umap_clustering = function(E13, E14, name, dimensions) {
+    E13 = run_umap(E13, dimensions)
+    E14 = run_umap(E14, dimensions)
+    umap_plot_13 = DimPlot(E13, reduction = 'umap', label = TRUE)
+    umap_plot_14 = DimPlot(E14, reduction = 'umap', label = TRUE)
+    umap_plot = umap_plot_13 + umap_plot_14
+    # saveRDS(data, file = paste0('../plots/umap_', rds_name, '.rds'))
+    ggsave(file=paste0(plots_dir, name, '_umap.pdf'), plot=umap_plot, width=30, units='cm')
+}
+
+
+# ==================================================================
+
+# Set dataset to either het or hom
+mouse_model = 'hom'
+# mouse_model = 'het'
+print('Mouse model:', mouse_model)
+
+E13_dataset_name = paste0('E13_', mouse_model)  # E13_hom or E13_het
+E14_dataset_name = paste0('E14_', mouse_model)  # E14_hom or E14_het
+plots_dir = paste0('./plots_', mouse_model, '/')
+dir.create(plots_dir)
 
 # Load datasets
-data_dir <- file.path(dirname(getwd()), 'data')
+data_dir = file.path(dirname(getwd()), 'data')
 print(data_dir)
-E13_hom_file = file.path(data_dir, 'E13_hom.csv')
-E14_hom_file = file.path(data_dir, 'E14_hom.csv')
+E13_csv_file = file.path(data_dir, paste0(E13_dataset_name, '.csv'))
+E14_csv_file = file.path(data_dir, paste0(E14_dataset_name, '.csv'))
 
-######################
+E13 = load_dataset(E13_csv_file, E13_dataset_name)
+E14 = load_dataset(E14_csv_file, E14_dataset_name)
+
+
 # Quality Control
-######################
+E13 = quality_control_plots(E13, E13_dataset_name)
+E14 = quality_control_plots(E14, E14_dataset_name)
 
-# E13_HOM
-E13_hom <- load_dataset(E13_hom_file, 'E13_hom')
-qc_plots(E13_hom, 'E13_hom')
-E13_hom <- subset(E13_hom, subset=nFeature_RNA < 6000 & nCount_RNA < 35000)  # Filter out cells found from quality control
-print(cat('E13_hom subset: ', dim(E13_hom)))
+# Filter out cells found from quality control
+E13_subset = subset(E13, subset = nFeature_RNA < 5500 & nCount_RNA > 1000 &
+                                   nCount_RNA < 28000 & percent.mt > 1 &
+                                   percent.mt < 5)
+E14_subset = subset(E14, subset = nFeature_RNA > 1000 & nFeature_RNA < 7000 &
+                                   nCount_RNA > 100 & nCount_RNA < 35000 &
+                                   percent.mt > 1 & percent.mt < 8)
+print(cat('E13 subset: ', dim(E13_subset)))
+print(cat('E14 subset: ', dim(E14_subset)))
 
-# E14_HOM
-E14_hom <- load_dataset(E14_hom_file, 'E14_hom')
-qc_plots(E14_hom, 'E14_hom')
-E14_hom <- subset(E14_hom, subset=nFeature_RNA < 7500 & nCount_RNA < 45000)  # Filter out cells found from quality control
-print(cat('E14_hom subset: ', dim(E14_hom)))
-
-# Merge E14_hom and E13_hom only for visualisation purposes - avoid 2 plots
-E13_E14 <- merge(E13_hom, E14_hom, add.cell.ids=c('E13_hom', 'E14_hom'))
-pdf(file='feature_scatter_plot.pdf')
-FeatureScatter(E13_E14, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA')
+# Merge E14_subset and E13_subset only for visualisation purposes - avoid 2 plots
+E13_E14 = merge(E13_subset, E14_subset, add.cell.ids=c(E13_dataset_name, E14_dataset_name))
+feature_scatter_plot = FeatureScatter(E13_E14, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA')
+ggsave(file=paste0(plots_dir, 'E13_E14_', mouse_model, '_feature_plot.pdf'), plot=feature_scatter_plot)
 
 
 # LogNormalize normalizes the feature expression measurements for each cell by the total expression,
 # multiplies this by a scale factor (10,000 by default), and log-transforms the result.
-E13_hom <- NormalizeData(E13_hom, normalization.method = 'LogNormalize', scale.factor = 10000)  # Normalise data
-E14_hom <- NormalizeData(E14_hom, normalization.method = 'LogNormalize', scale.factor = 10000)  # Normalise data
+E13_subset = NormalizeData(E13_subset, normalization.method = 'LogNormalize', scale.factor = 10000)  # Normalise data
+E14_subset = NormalizeData(E14_subset, normalization.method = 'LogNormalize', scale.factor = 10000)  # Normalise data
 
 
 # Feature Selection
-E13_hom <- feature_selection(E13_hom)
-E14_hom <- feature_selection(E14_hom)
+E13_subset = feature_selection(E13_subset, E13_dataset_name)
+E14_subset = feature_selection(E14_subset, E14_dataset_name)
 
 # Scaling - 0 mean, 1 variance
-E13_hom <- scaling(E13_hom)
-E14_hom <- scaling(E14_hom)
+E13_processed = scaling(E13_subset)
+E14_processed = scaling(E14_subset)
 
 # Dimensionality reduction
-E13_hom <- RunPCA(E13_hom, features = VariableFeatures(object = E13_hom))
-E14_hom <- RunPCA(E14_hom, features = VariableFeatures(object = E14_hom))
+E13_processed = RunPCA(E13_processed, features = VariableFeatures(object = E13_processed))
+E14_processed = RunPCA(E14_processed, features = VariableFeatures(object = E14_processed))
 
 # Plot 2 principal components of PCA for both datasets side by side
-par(mfrow=c(1,2))
-pca_13_hom <- plot(DimPlot(E13_hom, reduction = 'pca'))
-pca_14_hom <- plot(DimPlot(E14_hom, reduction = 'pca'))
-grid.arrange(pca_13_hom, pca_14_hom, nrow=1)
+plot_first_pc_directions(E13_processed, E14_processed, paste0('E13_E14_', mouse_model))
 
-# Plot heatmap
-par(mfrow=c(1,2))
-heatmap_13_hom <- DimHeatmap(E13_hom, dims = 1, cells = 500, balanced = TRUE)
-heatmap_14_hom <- DimHeatmap(E14_hom, dims = 1, cells = 500, balanced = TRUE)
-grid.arrange(heatmap_13_hom, heatmap_14_hom, nrow=1)
+# plot_heatmap(E13_processed, E14_processed, paste0('E13_E14_', mouse_model))
 
-# Define number of principal components
-JackStraw(E13_hom, num.replicate = 100)
-ScoreJackStraw(E13_hom, dims = 1:20)
-
-JackStraw(E14_hom, num.replicate = 100)
-ScoreJackStraw(E14_hom, dims = 1:20)
-
-par(mfrow=c(1,2))
-elbow_13_hom <- ElbowPlot(E13_hom)
-elbow_14_hom <- ElbowPlot(E14_hom)
-grid.arrange(elbow_13_hom, elbow_14_hom, nrow=1)
-
+# Define number of PCs from the elbow plot --> 20
+elbow_plot(E13_processed, E14_processed, paste0('E13_E14_', mouse_model), 50)
 
 # Clustering
-umap_clustering(E13_hom, 'E13_hom', 15)
-umap_clustering(E14_hom, 'E14_hom', 15)
+plot_umap_clustering(E13_processed, E14_processed, paste0('E13_E14_', mouse_model), 20)
