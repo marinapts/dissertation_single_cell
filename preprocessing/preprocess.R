@@ -8,6 +8,7 @@ library(cowplot)
 
 
 load_dataset = function(file, name) {
+    print(paste0('Loading dataset ', file))
     gene_expression_matrix = read.csv(file, row.names=1)  # Load csv file
     seuratObj = CreateSeuratObject(counts=gene_expression_matrix, project=name)  # Create Seurat object
     print(cat(name, dim(seuratObj)))
@@ -97,7 +98,7 @@ plot_umap_clustering = function(E13, E14, name, dimensions) {
 # Set dataset to either het or hom
 mouse_model = 'hom'
 # mouse_model = 'het'
-print('Mouse model:', mouse_model)
+print(paste0('Mouse model: ', mouse_model))
 
 E13_dataset_name = paste0('E13_', mouse_model)  # E13_hom or E13_het
 E14_dataset_name = paste0('E14_', mouse_model)  # E14_hom or E14_het
@@ -119,12 +120,21 @@ E13 = quality_control_plots(E13, E13_dataset_name)
 E14 = quality_control_plots(E14, E14_dataset_name)
 
 # Filter out cells found from quality control
-E13_subset = subset(E13, subset = nFeature_RNA < 5500 & nCount_RNA > 1000 &
-                                   nCount_RNA < 28000 & percent.mt > 1 &
-                                   percent.mt < 5)
-E14_subset = subset(E14, subset = nFeature_RNA > 1000 & nFeature_RNA < 7000 &
-                                   nCount_RNA > 100 & nCount_RNA < 35000 &
-                                   percent.mt > 1 & percent.mt < 8)
+if (mouse_model == 'hom') {
+    E13_subset = subset(E13, subset = nFeature_RNA > 0 & nFeature_RNA < 5500 &
+                                      nCount_RNA > 1000 & nCount_RNA < 28000 &
+                                      percent.mt > 1 & percent.mt < 5)
+    E14_subset = subset(E14, subset = nFeature_RNA > 1000 & nFeature_RNA < 7000 &
+                                      nCount_RNA > 100 & nCount_RNA < 35000 &
+                                      percent.mt > 1 & percent.mt < 8)
+} else {
+    E13_subset = subset(E13, subset = nFeature_RNA > 0 & nFeature_RNA < 5000 &
+                                      nCount_RNA > 1000 & nCount_RNA < 25000 &
+                                      percent.mt > 1 & percent.mt < 5)
+    E14_subset = subset(E14, subset = nFeature_RNA > 1000 & nFeature_RNA < 6000 &
+                                      nCount_RNA > 200 & nCount_RNA < 27000 &
+                                      percent.mt > 1 & percent.mt < 8)
+}
 print(cat('E13 subset: ', dim(E13_subset)))
 print(cat('E14 subset: ', dim(E14_subset)))
 
