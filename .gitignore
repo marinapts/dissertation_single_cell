@@ -5,3 +5,5 @@ plots/
 old_plots/
 preprocessing/plots_hom/
 preprocessing/plots_het/
+preprocessing/rds_hom/
+preprocessing/rds_het/

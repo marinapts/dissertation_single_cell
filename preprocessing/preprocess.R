@@ -88,8 +88,8 @@ plot_umap_clustering = function(E13, E14, name, dimensions) {
     umap_plot_13 = DimPlot(E13, reduction = 'umap', label = TRUE)
     umap_plot_14 = DimPlot(E14, reduction = 'umap', label = TRUE)
     umap_plot = umap_plot_13 + umap_plot_14
-    saveRDS(E13, file = paste0(plots_dir, 'umap_E13', '.rds'))
-    saveRDS(E14, file = paste0(plots_dir, 'umap_E14', '.rds'))
+    saveRDS(E13, file = paste0(rds_dir, 'umap_E13', '.rds'))
+    saveRDS(E14, file = paste0(rds_dir, 'umap_E14', '.rds'))
     ggsave(file=paste0(plots_dir, name, '_umap.pdf'), plot=umap_plot, width=30, units='cm')
 }
 
@@ -104,7 +104,9 @@ print(paste0('Mouse model: ', mouse_model))
 E13_dataset_name = paste0('E13_', mouse_model)  # E13_hom or E13_het
 E14_dataset_name = paste0('E14_', mouse_model)  # E14_hom or E14_het
 plots_dir = paste0('./plots_', mouse_model, '/')
+rds_dir = paste0('./rds_', mouse_model, '/')
 dir.create(plots_dir)
+dir.create(rds_dir)
 
 # Load datasets
 data_dir = file.path(dirname(getwd()), 'data')
@@ -173,7 +175,3 @@ elbow_plot(E13_processed, E14_processed, paste0('E13_E14_', mouse_model), 50)
 
 # Clustering
 plot_umap_clustering(E13_processed, E14_processed, paste0('E13_E14_', mouse_model), 20)
-
-# To load the rds seurat files directly, run only the following:
-E13_pca_umap <- readRDS(file = paste0(plots_dir, 'umap_E13', '.rds'))
-E14_pca_umap <- readRDS(file = paste0(plots_dir, 'umap_E14', '.rds'))
