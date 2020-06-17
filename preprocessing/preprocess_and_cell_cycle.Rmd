@@ -1,0 +1,476 @@
+---
+title: "Single cell preprocessing with Seurat"
+output:
+  html_notebook:
+    toc: yes
+    number_sections: yes
+    toc_float: no
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+---
+
+
+```{r warning=FALSE}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(gridExtra)
+library(optparse)
+library(cowplot)
+library(knitr)
+library(Hmisc)
+```
+
+
+# Load datasets
+
+```{r}
+load_dataset = function(file, name) {
+    print(paste0('Loading dataset ', file))
+    gene_expression_matrix = read.csv(file, row.names=1)  # Load csv file
+    # Create Seurat object
+    seuratObj = CreateSeuratObject(counts=gene_expression_matrix, project=name)
+    print(cat(name, dim(seuratObj)))
+    return(seuratObj)
+}
+```
+
+```{r echo=FALSE}
+data_dir = file.path(dirname(getwd()), 'data')
+```
+
+
+```{r echo=FALSE}
+E13_hom = load_dataset(file.path(data_dir, 'E13_hom.csv'), 'E13_hom')
+E14_hom = load_dataset(file.path(data_dir, 'E14_hom.csv'), 'E14_hom')
+E13_het = load_dataset(file.path(data_dir, 'E13_het.csv'), 'E13_het')
+E14_het = load_dataset(file.path(data_dir, 'E14_het.csv'), 'E14_het')
+```
+
+
+| Dataset | Genes | Cells |
+|:------|:-----|:-----|
+| E13_hom | 30,213 | 6,333 |
+| E14_hom | 30,213 | 4,446 |
+| E13_het | 30,213 | 3,797 |
+| E14_het | 30,213 | 4,380 |
+
+
+
+# Quality Control (QC)
+
+We want to filter out cells based on technical or biological parameters. We explore QC metrics and filter out cells from each dataset, ideally being consistent for each technology (applying the same threshold for E13 hom/het and the same for E14 hom/het).
+
+- E13 (hom/het): 10X Genomics v2.0
+- E14 (hom/het): 10X Genomics v3.0
+
+Below, we visualize gene counts (nFeature_RNA) and molecule counts (nCount_RNA), plot their relationship, and exclude cells with a clear outlier number of genes detected as potential multiplets. We also filter cells based on the percentage of mitochondrial genes present (percent.mt).
+
+Plot distributions of QC metrics and select thresholds to filter out data.
+
+Violin plot:
+
+- **nFeature_RNA**: Number of unique genes detected in each cell: A few genes → low quality
+
+- **nCount_RNA**: Total number of molecules detected within a cell (correlates with unique genes)
+
+- **percent.mt**: Percentage of reads that map to the mitochondrial genome. High percentage of mitochondrial genes → low quality
+
+
+```{r}
+quality_control_plots = function(data, name) {
+    # Add percentage of mitochondrial genes to the Seurat object
+    data[['percent.mt']] = PercentageFeatureSet(data, pattern = '^mt-')
+
+    # Visualize QC metrics as a violin plot
+    violin_plot = VlnPlot(data, features = c('nFeature_RNA', 'nCount_RNA', 'percent.mt'), ncol = 3)
+    # Visualize relationship between nCount_RNA and nFeature_RNA
+    scatter_plot_1 = FeatureScatter(data, feature1 = 'nCount_RNA', feature2 = 'percent.mt')
+    scatter_plot_2 = FeatureScatter(data, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA')
+    scatter_plot = scatter_plot_1 + scatter_plot_2
+    plot(violin_plot)
+    plot(scatter_plot)
+    return(data)
+}
+```
+
+
+```{r fig.width=13, fig.height=7}
+E13_hom_qc = quality_control_plots(E13_hom, 'E13_hom')
+```
+
+
+```{r fig.width=13, fig.height=7}
+E14_hom_qc = quality_control_plots(E14_hom, 'E14_hom')
+```
+
+```{r fig.width=13, fig.height=7}
+E13_het_qc = quality_control_plots(E13_het, 'E13_het')
+```
+
+```{r fig.width=13, fig.height=7}
+E14_het_qc = quality_control_plots(E14_het, 'E14_het')
+```
+
+## Remove cells based on a common threshold for each embryonic day
+
+```{r}
+E13_hom_subset = subset(E13_hom_qc, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
+
+E13_het_subset = subset(E13_het_qc, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
+
+
+E14_hom_subset = subset(E14_hom_qc, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
+
+E14_het_subset = subset(E14_het_qc, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
+
+```
+
+
+| Dataset | Genes | Cells | Cells after QC |
+|:------|:-----|:-----|:-----|
+| E13_hom | 30,213 | 6,333 | 6,256 |
+| E14_hom | 30,213 | 4,446 | 4,203 |
+| E13_het | 30,213 | 3,797 | 3,717 |
+| E14_het | 30,213 | 4,380 | 4,141 |
+
+
+
+
+# Normalisation and Regression of unwanted variation
+
+After removing unwanted cells from the datasets, we normalise the raw counts to account for differences in sequencing depth per cell for each sample by applying [sctransform normalization](https://satijalab.org/seurat/v3.0/sctransform_vignette.html). Sctransform models the UMI counts using a regularized negative binomial model to remove the variation due to sequencing depth (total nUMIs per cell), while adjusting the variance based on pooling information across genes with similar abundances (similar to some bulk RNA-seq methods).
+
+Sctransform automatically regresses out sequencing depth (nUMIs); however, there are other sources of uninteresting variation in the data that is often specific to the dataset, such as the cell cycle phase. We will first check if the cell cycle phase is a major source of variation in the dataset, and if it is we will regress it out.
+
+
+## Cell cycle phase
+
+A known source of biological variation that can explain the data is the cell cycle.
+Given a list of cell cycle phase marker genes in the textfile *regev_lab_cell_cycle_genes.txt*, we use the Seurat method [CellCycleScoring](https://satijalab.org/seurat/v3.1/cell_cycle_vignette.html) to assign scores to each cell for the cell cycle phases S and G2M. The cell is assigned to the phase with the highest score. If both scores are low, the cell is classified to the phase G1, even if it’s at the mitosis phase.
+
+We perform cell cycle scoring on the full normalised dataset (before feature selection and dim. reduction)!
+
+Cell cycle phases:
+
+- **G1**: growth
+
+- **S**: DNA Synthesis
+
+- **G2M**: growth and preparation for mitosis
+
+
+Load cell cycle genes from a regev publication. These are human genes so they need to be formatted to mouse genes. Then we separate them to S phase and G2M phase markers.
+
+```{r}
+human.cc = scan('regev_lab_cell_cycle_genes.txt', what = 'character')
+mouse.cc = human.cc %>% tolower() %>% capitalize() %>% unlist
+m.s = mouse.cc[1:43]  # S: DNA synthesis
+m.g2m = mouse.cc[44:97]  # G2M: Growth and preparation for mitosis
+```
+
+
+CellCycleScoring stores S and G2/M scores in object meta data, along with the predicted classification of each cell in either G2M, S or G1 phase.
+
+In the CellCycleScoring vignette attached above, CellCycleScoring is applied on normalised count data using `NormalizeData` while in the previous steps we used `SCTransform`, which combined normalisation, scaling and feature selection. Therefore, here we apply `NormalizeData` on the initial datasets after quality control, then run `CellCycleScoring`, which learns cell cycle scores that can be added to the `vars.to.regress` parameter in `SCTransform`. For all downstream analyses we can use the SCT assay.
+
+```{r}
+check_cell_cycle = function(data, s_phase, g2m_phase) {
+    data_norm = NormalizeData(data, verbose = FALSE)
+    data_cell_cycle = CellCycleScoring(object = data_norm,
+                                       s.features = s_phase,
+                                       g2m.features = g2m_phase,
+                                       set.ident = F,
+                                       verbose = FALSE)
+    data_transformed = SCTransform(data_cell_cycle,
+                                   do.correct.umi = FALSE,
+                                   vars.to.regress = 'percent.mt',
+                                   verbose = FALSE)
+    
+    data_reduced = RunPCA(data_transformed, verbose = FALSE)
+    pca_plot = DimPlot(data_reduced, reduction='pca', group.by = 'Phase')
+    
+    data_reduced = RunUMAP(data_reduced, dims = 1:30, verbose = FALSE)
+    data_reduced = FindNeighbors(data_reduced, dims = 1:30, verbose = FALSE)
+    data_reduced = FindClusters(data_reduced, verbose = FALSE)
+    umap_plot = DimPlot(data_reduced, reduction = 'umap', group.by = 'Phase')
+    
+    plot(pca_plot + umap_plot)
+    return(data_cell_cycle)  # Returns the object including the scores for the cell cycles
+}
+```
+
+
+```{r warning=FALSE, message=FALSE}
+E13_hom_subset = check_cell_cycle(E13_hom_subset, m.s, m.g2m)
+```
+
+```{r warning=FALSE, message=FALSE}
+E14_hom_subset = check_cell_cycle(E14_hom_subset, m.s, m.g2m)
+```
+
+
+```{r warning=FALSE, message=FALSE}
+E13_het_subset = check_cell_cycle(E13_het_subset, m.s, m.g2m)
+```
+
+
+```{r warning=FALSE, message=FALSE}
+E14_het_subset = check_cell_cycle(E14_het_subset, m.s, m.g2m)
+```
+
+
+
+
+## SCTransform and Regression
+
+SCTransform replaces the functions *NormalizeData*, *ScaleData*, and *FindVariableFeatures*. However, we do need to call `NormalizeData` before `CellCycleScoring`, since it expects as input the normalised raw count data.
+
+Transformed data will be available in the SCT assay, which is set as the default after running sctransform. We refer to each normalised dataset E13_hom_normalised etc as 'seurat_obj' to make the doc more abstract.
+
+- `seurat_obj[["SCT"]]@scale.data` contains the residuals (normalized values), and is used directly as input to PCA. This matrix is non-sparse, and can therefore take up a lot of memory if stored for all genes. To save memory, we store these values only for variable genes, by setting the `return.only.var.genes = TRUE` by default in the SCTransform function call.
+- The ‘corrected’ UMI counts are stored in `seurat_obj[["SCT"]]@counts`. We store log-normalized versions of these corrected counts in seurat_obj[["SCT"]]@data, which are very helpful for visualization.
+
+During normalization, we can also remove confounding sources of variation, such as mitochondrial mapping percentage and the cell cycle phases, since we saw that it is a major source of variation in the data.
+
+
+
+```{r echo=FALSE}
+E13_hom_normalised = SCTransform(E13_hom_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E14_hom_normalised = SCTransform(E14_hom_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E13_het_normalised = SCTransform(E13_het_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E14_het_normalised = SCTransform(E14_het_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+
+```
+
+Dataset dimensions after SCTransform:
+
+| Dataset | Genes | Cells |
+|:------|:-----|:-----|
+| E13_hom | 15,356 | 6,256 |
+| E14_hom | 15,785 | 4,203 |
+| E13_het | 15,042 | 3,717 |
+| E14_het | 15,648 | 4,141 |
+
+
+# Dimensionality reduction
+
+## Run PCA and plot first 2 principal components
+
+
+```{r}
+run_plot_PCA = function(data) {
+    data_pca = RunPCA(data, verbose = FALSE)
+    feature_plot = FeaturePlot(object = data_pca, features = c('nCount_RNA', 'percent.mt'))
+    phase_plot = DimPlot(data_pca, reduction = 'pca', group.by = 'Phase')
+    plot(feature_plot + phase_plot)
+    return(data_pca)
+}
+```
+
+```{r}
+E13_hom_pca = run_plot_PCA(E13_hom_normalised)
+```
+
+```{r}
+E14_hom_pca = run_plot_PCA(E14_hom_normalised)
+```
+
+
+
+```{r}
+E13_het_pca = run_plot_PCA(E13_het_normalised)
+```
+
+
+```{r}
+E14_het_pca = run_plot_PCA(E14_het_normalised)
+```
+
+## ElbowPlot to determine statistically significant PCs
+
+ElbowPlot for E13_hom_pca. The plot is similar for the rest.
+
+```{r}
+ElbowPlot(E13_hom_pca, ndims = 50)
+```
+
+
+
+## Run UMAP on the reduced datasets and remove the Cajal-Retzius cells
+
+From Wikipedia: [Cajal–Retzius cells](https://en.wikipedia.org/wiki/Cajal%E2%80%93Retzius_cell) (CR cells) (also known as Horizontal cells of Cajal) are a heterogeneous population of morphologically and molecularly distinct reelin-producing cell types in the marginal zone/layer I of the developmental cerebral cortex and in the immature hippocampus of different species and at different times during embryogenesis and postnatal life.
+
+```{r}
+run_umap = function(data, from_dimension, to_dimension) {
+    data <- RunUMAP(data, dims = from_dimension:to_dimension, verbose = FALSE)
+
+    data <- FindNeighbors(data, dims = from_dimension:to_dimension, verbose = FALSE)
+    data <- FindClusters(data, verbose = FALSE)
+
+    dim_plot = DimPlot(data, reduction = 'umap', label = TRUE) + NoLegend()
+    phase_plot = DimPlot(data, reduction = 'umap', group.by = 'Phase')
+    plot(dim_plot + phase_plot)
+    return(data)
+}
+```
+
+
+```{r message=FALSE, warning=FALSE}
+E13_hom_umap = run_umap(E13_hom_pca, 1, 30)
+```
+
+
+
+```{r fig.width=5, fig.height=5}
+# Remove Cajal-Retzius cells -final E13_HOM plot:
+E13_hom_umap_subset = subset(E13_hom_umap, idents = c('9'), invert = TRUE)
+plot(DimPlot(E13_hom_umap_subset, label = TRUE) + labs(title = 'E13_HOM'))
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+E14_hom_umap = run_umap(E14_hom_pca, 1, 30)
+```
+
+```{r fig.width=5, fig.height=5}
+# Remove Cajal-Retzius cells -final E14_HOM plot:
+E14_hom_umap_subset = subset(E14_hom_umap, idents = c('12'), invert = TRUE)
+plot(DimPlot(E14_hom_umap_subset, label = TRUE) + labs(title = 'E14_HOM'))
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+E13_het_umap = run_umap(E13_het_pca, 1, 30)
+```
+
+
+```{r fig.width=5, fig.height=5}
+# Remove Cajal-Retzius cells -final E13_HET plot:
+E13_het_umap_subset = subset(E13_het_umap, idents = c('9'), invert = TRUE)
+plot(DimPlot(E13_het_umap_subset, label = TRUE) + labs(title = 'E13_HET'))
+```
+
+
+```{r message=FALSE, warning=FALSE}
+E14_het_umap = run_umap(E14_het_pca, 1, 30)
+```
+
+
+```{r fig.width=5, fig.height=5}
+# Remove Cajal-Retzius cells -final E14_HET plot:
+E14_het_umap_subset = subset(E14_het_umap, idents = c('11'), invert = TRUE)
+plot(DimPlot(E14_het_umap_subset, label = TRUE) + labs(title = 'E14_HET'))
+```
+
+
+
+
+Final dataset dimensions:
+
+| Dataset | Genes | Cells | Cells after filtering out |
+|:------|:-----|:-----|:-----|
+| E13_hom | 15,356 | 6,256 | 6,193 |
+| E14_hom | 15,785 | 4,203 | 4,171 |
+| E13_het | 15,042 | 3,717 | 3,653 |
+| E14_het | 15,648 | 4,141 | 4,119 |
+
+
+
+
+# Developmental trajectory of cell type markers
+
+## Neural cell types
+
+There are three major cell types in these datasets:
+
+1. **Neural progenitors**, marker *Pax6* --> cells that are capable of dividing a limited number of times and have the capacity to differentiate into a restricted repertoire of neuronal and glial cell types.
+
+2. **Intermediate progenitors**, marker *Eomes* --> a type of progenitor cells in the developing cerebral cortex, which produce neuron cells via a process known as neurogenesis. I
+
+3. **Post-mitotic neurons**, marker *Tbr1* --> mature cells that no longer undergo mitosis.
+
+```{r}
+cell_type_markers = c('Pax6', 'Eomes', 'Tbr1')
+```
+
+
+```{r}
+FeaturePlot(E13_hom_umap_subset, reduction='umap', features=cell_type_markers)
+```
+
+
+```{r}
+FeaturePlot(E14_hom_umap_subset, reduction='umap', features=cell_type_markers)
+```
+
+
+```{r}
+FeaturePlot(E13_het_umap_subset, reduction='umap', features=cell_type_markers)
+```
+
+
+```{r}
+FeaturePlot(E14_het_umap_subset, reduction='umap', features=cell_type_markers)
+```
+
+
+
+## Ectopic gene markers
+
+The following genes were identified from the bulk RNA-seq analysis as ectopic markers, since they are not supposed to be expressed in the cell types above.
+
+These genes were highly upregulated after Pax6 inactivation and are also related to neural development. They are only visible in HOMs (though more clear at E14_HOM) and they shouldn't be expressed at all in HETs.
+
+### Plot ectopic genes for all PCs and all datasets
+
+```{r}
+ectopic_markers = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3')
+```
+
+
+```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
+FeaturePlot(E13_hom_umap_subset, reduction='umap', features=ectopic_markers)
+```
+
+
+```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
+FeaturePlot(E14_hom_umap_subset, reduction='umap', features=ectopic_markers)
+```
+
+
+```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
+FeaturePlot(E13_het_umap_subset, reduction='umap', features=ectopic_markers)
+```
+
+
+```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
+FeaturePlot(E14_het_umap_subset, reduction='umap', features=ectopic_markers)
+```
+
+
+### Plot ectopic genes for a subset of PCs and only HOMs
+
+Plot umap for 10-30 PCs
+
+```{r fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+E13_hom_umap_10_30 = run_umap(E13_hom_pca, 10, 30)
+E13_hom_umap_10_30_sub = subset(E13_hom_umap_10_30, idents = c('10', '12'), invert = TRUE)
+FeaturePlot(E13_hom_umap_10_30_sub, reduction='umap', features=ectopic_markers)
+```
+
+
+```{r fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+E14_hom_umap_10_30 = run_umap(E14_hom_pca, 10, 30)
+E14_hom_umap_10_30_sub = subset(E14_hom_umap_10_30, idents = c('14'), invert = TRUE)
+FeaturePlot(E14_hom_umap_10_30_sub, reduction='umap', features=ectopic_markers)
+```
+

@@ -1,0 +1,169 @@
+---
+title: "Assign cell types using cellAssign"
+output:
+  html_notebook:
+    toc: yes
+    number_sections: yes
+    toc_float: no
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+---
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(tensorflow)
+  library(cellassign)
+  library(pheatmap)
+  library(here)
+  library(scater)
+})
+```
+
+```{r}
+set.seed(1234)
+```
+
+
+
+# Load 10X scRNA-seq data from csv files
+
+```{r}
+data_dir <- here('data_qc')
+print(data_dir)
+```
+
+```{r}
+load_dataset <- function(file, name) {
+    print(paste0('Loading dataset ', file))
+    count_matrix.data <- read.csv(file, row.names=1)  # Load csv file
+    # Create Seurat object
+    count_matrix <- CreateSeuratObject(counts = count_matrix.data, project=name)
+    print(cat(name, dim(count_matrix)))
+    return(count_matrix)
+}
+```
+
+Load HOM datasets (counts) after removal of unwanted cells from quality control
+
+```{r}
+E13_hom <- load_dataset(file.path(data_dir, 'E13_hom.csv'), 'E13_hom')
+E13_hom.data <- as.SingleCellExperiment(E13_hom)  # Convert to SingleCellExperiment class
+
+E14_hom <- load_dataset(file.path(data_dir, 'E14_hom.csv'), 'E14_hom')
+E14_hom.data <- as.SingleCellExperiment(E14_hom)  # Convert to SingleCellExperiment class
+```
+
+
+
+`ComputeSumFactors` implements the deconvolution strategy for scaling normalisation of sparse count data.
+
+```{r}
+E13_hom.data <- scran::computeSumFactors(E13_hom.data, min.mean = 0.1)
+E14_hom.data <- scran::computeSumFactors(E14_hom.data, min.mean = 0.1)
+```
+
+
+# Assign cells to known cell types using cellassign
+
+There are three major cell types in these datasets:
+
+1. **Neural progenitors**, marker *Pax6* --> cells that are capable of dividing a limited number of times and have the capacity to differentiate into a restricted repertoire of neuronal and glial cell types.
+
+2. **Intermediate progenitors**, marker *Eomes* --> a type of progenitor cells in the developing cerebral cortex, which produce neuron cells via a process known as neurogenesis. I
+
+3. **Post-mitotic neurons**, marker *Tbr1* --> mature cells that no longer undergo mitosis.
+
+```{r}
+marker_list <- list(
+    `Neural progenitors` = c('Pax6', 'Vim', 'Sox2'),
+    `Intermediate progenitors` = c('Eomes', 'Btg2'),
+    `Post-mitotic neurons` = c('Tbr1', 'Sox5'),
+    `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3')
+)
+```
+
+
+Binary gene-by-celltype marker gene matrix
+
+```{r}
+mgi <- marker_list_to_mat(marker_list, include_other = FALSE)
+pheatmap(mgi)
+```
+
+
+We make sure all of these markers exist in our dataset:
+Comment out:
+
+```{r}
+marker_in_E13_hom <- match(rownames(mgi), rownames(E13_hom))
+stopifnot(all(!is.na(marker_in_E13_hom)))
+
+marker_in_E14_hom <- match(rownames(mgi), rownames(E14_hom))
+stopifnot(all(!is.na(marker_in_E14_hom)))
+```
+
+
+
+We subset the seurat object to just the marker genes:
+
+```{r}
+E13_hom_marker <- E13_hom.data[marker_in_E13_hom, ]
+counts(E13_hom_marker) <- as.matrix(counts(E13_hom_marker))
+print(dim(E13_hom_marker))
+
+E14_hom_marker <- E14_hom.data[marker_in_E14_hom, ]
+counts(E14_hom_marker) <- as.matrix(counts(E14_hom_marker))
+print(dim(E14_hom_marker))
+```
+
+Remove entries that are not present in our dataset
+
+```{r}
+mgi_E13_hom <- mgi[rownames(mgi) %in% rownames(E13_hom.data), ]
+mgi_E14_hom <- mgi[rownames(mgi) %in% rownames(E14_hom.data), ]
+```
+
+
+
+## E13_HOM dataset
+
+Call `cellassign` passing the seurat object, marker info, the size factors
+
+```{r}
+fit_E13_hom <- cellassign(exprs_obj = E13_hom.data[rownames(mgi_E13_hom), ],
+                          marker_gene_info = mgi,
+                          s = sizeFactors(E13_hom.data))
+```
+
+Add the cell types to the data object
+
+```{r}
+E13_hom.data$cell_type <- fit_E13_hom$cell_type
+plotUMAP(E13_hom.data, colour_by = 'cell_type')
+pheatmap(fit_E13_hom$mle_params$gamma)
+```
+
+
+
+## E14_HOM dataset
+
+
+```{r}
+fit_E14_hom <- cellassign(exprs_obj = E14_hom.data[rownames(mgi), ],
+                          marker_gene_info = mgi_E14_hom,
+                          s = sizeFactors(E14_hom.data))
+```
+
+
+```{r}
+E14_hom.data$cell_type <- fit_E14_hom$cell_type
+plotUMAP(E14_hom.data, colour_by = 'cell_type')
+pheatmap(fit_E14_hom$mle_params$gamma)
+```
