@@ -4,12 +4,13 @@ library(ggplot2)
 
 mouse_model = 'hom'
 # mouse_model = 'het'
-rds_dir = paste0('./rds_', mouse_model, '/')
-plots_dir = paste0('./plots_', mouse_model, '/')
+rds_dir = paste0('./rds_', mouse_model, '_12_june/')
+plots_dir = paste0('./plots_', mouse_model, '_12_june/')
 
 # Load datasets
-E13 = readRDS(file = paste0(rds_dir, 'umap_E13_no_cajal_retzius.rds'))
-E14 = readRDS(file = paste0(rds_dir, 'umap_E14_no_cajal_retzius.rds'))
+# For cell cycle scoring, we need to load the full normalised preprocessed datasets, not the umap!
+E13 = readRDS(file = paste0(rds_dir, 'E13_normalised.rds'))
+E14 = readRDS(file = paste0(rds_dir, 'E14_normalised.rds'))
 
 
 # Load cell cycle genes from a regev publication. These are human genes so need to be
@@ -17,7 +18,7 @@ E14 = readRDS(file = paste0(rds_dir, 'umap_E14_no_cajal_retzius.rds'))
 human.cc <- scan('regev_lab_cell_cycle_genes.txt', what = 'character')
 mouse.cc <- human.cc %>% tolower() %>% capitalize() %>% unlist
 m.s <- mouse.cc[1:43]  # S: DNA synthesis
-m.g2s <- mouse.cc[44:97]  # G2: Growth and preparation for mitosis
+m.g2m <- mouse.cc[44:97]  # G2: Growth and preparation for mitosis
 
 # CellCycleScoring stores S and G2/M scores in object meta data, along with the predicted classification of each cell
 # in either G2M, S or G1 phase.

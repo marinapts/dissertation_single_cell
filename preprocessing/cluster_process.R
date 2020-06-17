@@ -19,8 +19,8 @@ set.seed(42)
 # mouse_model = 'hom'
 mouse_model = 'het'
 print(paste0('Mouse model: ', mouse_model))
-plots_dir = paste0('./plots_', mouse_model, '/')
-rds_dir = paste0('./rds_', mouse_model, '/')
+plots_dir = paste0('./plots_', mouse_model, '_12_june/')
+rds_dir = paste0('./rds_', mouse_model, '_12_june/')
 
 
 # To load the rds seurat files directly, run only the following:
@@ -54,19 +54,3 @@ print(dim(E13_final_subset))
 print(dim(E14_final_subset))
 
 save_umap_without_cajal_retzius(E13_final_subset, E14_final_subset, paste0('E13_E14_', mouse_model))
-
-# Embeddings(object = object[["umap"]])
-# umap_embeddings = Embeddings(object = E13_final_subset[["umap"]])
-
-# umap_embeddings = as.data.frame(E13_final_subset@reductions$umap@cell.embeddings, stringsAsFactors = F)
-# # E13_after_deletion = umap_embeddings[umap_embeddings$UMAP_2 < 9,]
-# cells_to_remove = umap_embeddings[umap_embeddings$UMAP_2 > 9,]
-# cell_names = rownames(cells_to_remove)
-# # final = subset(E13_final_subset, cells = cell_names)
-# final = subset(E13_final_subset, cells = -c(cell_names))
-
-
-# drop <- c(cell_names)
-# for(i in columns.to.remove) {
-#     E13_final_subset[[i]] <- NULL
-# }

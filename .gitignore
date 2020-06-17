@@ -1,9 +1,10 @@
 sftp-config.json
 data/
+data_qc/
 plots/
 .env/
 old_plots/
-preprocessing/plots_hom/
-preprocessing/plots_het/
-preprocessing/rds_hom/
-preprocessing/rds_het/
+preprocessing/plots_*/
+preprocessing/rds_*/
+preprocessing/.Rhistory
+preprocessing/*.html
