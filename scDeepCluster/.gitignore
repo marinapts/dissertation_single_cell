@@ -1,0 +1,5 @@
+.DS_Store
+.env/
+scRNA_seq_data/
+model_weights/
+.git/
