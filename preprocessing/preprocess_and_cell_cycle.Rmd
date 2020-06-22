@@ -16,15 +16,18 @@ output:
 
 
 ```{r warning=FALSE}
-library(dplyr)
-library(Seurat)
-library(patchwork)
-library(ggplot2)
-library(gridExtra)
-library(optparse)
-library(cowplot)
-library(knitr)
-library(Hmisc)
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(Seurat)
+    library(patchwork)
+    library(ggplot2)
+    library(gridExtra)
+    library(optparse)
+    library(cowplot)
+    library(knitr)
+    library(Hmisc)
+    library(here)
+})
 ```
 
 
@@ -43,6 +46,7 @@ load_dataset = function(file, name) {
 
 ```{r echo=FALSE}
 data_dir = file.path(dirname(getwd()), 'data')
+# or data_dir = here('data')
 ```
 
 
@@ -102,33 +106,34 @@ quality_control_plots = function(data, name) {
 
 
 ```{r fig.width=13, fig.height=7}
-E13_hom_qc = quality_control_plots(E13_hom, 'E13_hom')
+E13_hom[['qc']] = quality_control_plots(E13_hom, 'E13_hom')
 ```
 
 
 ```{r fig.width=13, fig.height=7}
-E14_hom_qc = quality_control_plots(E14_hom, 'E14_hom')
+E14_hom = quality_control_plots(E14_hom, 'E14_hom')
 ```
 
 ```{r fig.width=13, fig.height=7}
-E13_het_qc = quality_control_plots(E13_het, 'E13_het')
+E13_het = quality_control_plots(E13_het, 'E13_het')
 ```
 
 ```{r fig.width=13, fig.height=7}
-E14_het_qc = quality_control_plots(E14_het, 'E14_het')
+E14_het = quality_control_plots(E14_het, 'E14_het')
 ```
 
 ## Remove cells based on a common threshold for each embryonic day
 
+
 ```{r}
-E13_hom_subset = subset(E13_hom_qc, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
+E13_hom = subset(E13_hom, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
 
-E13_het_subset = subset(E13_het_qc, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
+E13_het = subset(E13_het, subset = (nFeature_RNA > 0 & nFeature_RNA < 6000) & (nCount_RNA > 1000 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 5))
 
 
-E14_hom_subset = subset(E14_hom_qc, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
+E14_hom = subset(E14_hom, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
 
-E14_het_subset = subset(E14_het_qc, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
+E14_het = subset(E14_het, subset = (nFeature_RNA > 1000 & nFeature_RNA < 7000) & (nCount_RNA > 100 & nCount_RNA < 30000) & (percent.mt > 1 & percent.mt < 10))
 
 ```
 
@@ -141,6 +146,24 @@ E14_het_subset = subset(E14_het_qc, subset = (nFeature_RNA > 1000 & nFeature_RNA
 | E14_het | 30,213 | 4,380 | 4,141 |
 
 
+
+### Write seurat objects after quality control in csv files
+
+```{r}
+write_to_csv = function(seurat_object, csv_name) {
+    write.table(as.matrix(GetAssayData(object = seurat_object, slot = "counts")), 
+            here('data_qc', csv_name), 
+            sep = ',', row.names = T, col.names = T, quote = F)
+}
+```
+
+
+```{r}
+write_to_csv(E13_hom, 'E13_hom.csv')
+write_to_csv(E14_hom, 'E14_hom.csv')
+write_to_csv(E13_het, 'E13_het.csv')
+write_to_csv(E14_het, 'E14_het.csv')
+```
 
 
 # Normalisation and Regression of unwanted variation
@@ -208,21 +231,21 @@ check_cell_cycle = function(data, s_phase, g2m_phase) {
 
 
 ```{r warning=FALSE, message=FALSE}
-E13_hom_subset = check_cell_cycle(E13_hom_subset, m.s, m.g2m)
+E13_hom = check_cell_cycle(E13_hom, m.s, m.g2m)
 ```
 
 ```{r warning=FALSE, message=FALSE}
-E14_hom_subset = check_cell_cycle(E14_hom_subset, m.s, m.g2m)
-```
-
-
-```{r warning=FALSE, message=FALSE}
-E13_het_subset = check_cell_cycle(E13_het_subset, m.s, m.g2m)
+E14_hom = check_cell_cycle(E14_hom, m.s, m.g2m) 
 ```
 
 
 ```{r warning=FALSE, message=FALSE}
-E14_het_subset = check_cell_cycle(E14_het_subset, m.s, m.g2m)
+E13_het = check_cell_cycle(E13_het, m.s, m.g2m)
+```
+
+
+```{r warning=FALSE, message=FALSE}
+E14_het = check_cell_cycle(E14_het, m.s, m.g2m)
 ```
 
 
@@ -230,7 +253,7 @@ E14_het_subset = check_cell_cycle(E14_het_subset, m.s, m.g2m)
 
 ## SCTransform and Regression
 
-SCTransform replaces the functions *NormalizeData*, *ScaleData*, and *FindVariableFeatures*. However, we do need to call `NormalizeData` before `CellCycleScoring`, since it expects as input the normalised raw count data.
+SCTransform replaces the functions *NormalizeData*, *ScaleData*, and *FindVariableFeatures*. However, we do need to call `NormalizeData` before `CellCycleScoring`, since it expects the normalised raw count data as input.
 
 Transformed data will be available in the SCT assay, which is set as the default after running sctransform. We refer to each normalised dataset E13_hom_normalised etc as 'seurat_obj' to make the doc more abstract.
 
@@ -241,11 +264,11 @@ During normalization, we can also remove confounding sources of variation, such 
 
 
 
-```{r echo=FALSE}
-E13_hom_normalised = SCTransform(E13_hom_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
-E14_hom_normalised = SCTransform(E14_hom_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
-E13_het_normalised = SCTransform(E13_het_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
-E14_het_normalised = SCTransform(E14_het_subset, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+```{r}
+E13_hom_norm = SCTransform(E13_hom, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E14_hom_norm = SCTransform(E14_hom, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E13_het_norm = SCTransform(E13_het, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
+E14_het_norm = SCTransform(E14_het, vars.to.regress = c('percent.mt', 'S.Score', 'G2M.Score'), verbose = FALSE)
 
 ```
 
@@ -259,6 +282,15 @@ Dataset dimensions after SCTransform:
 | E14_het | 15,648 | 4,141 |
 
 
+Save normalised datasets
+
+```{r}
+write_to_csv(E13_hom_norm, 'E13_hom_norm.csv')
+write_to_csv(E14_hom_norm, 'E14_hom_norm.csv')
+```
+
+
+
 # Dimensionality reduction
 
 ## Run PCA and plot first 2 principal components
@@ -266,31 +298,28 @@ Dataset dimensions after SCTransform:
 
 ```{r}
 run_plot_PCA = function(data) {
-    data_pca = RunPCA(data, verbose = FALSE)
-    feature_plot = FeaturePlot(object = data_pca, features = c('nCount_RNA', 'percent.mt'))
-    phase_plot = DimPlot(data_pca, reduction = 'pca', group.by = 'Phase')
+    data = RunPCA(data, verbose = FALSE)
+    feature_plot = FeaturePlot(object = data, features = c('nCount_RNA', 'percent.mt'))
+    phase_plot = DimPlot(data, reduction = 'pca', group.by = 'Phase')
     plot(feature_plot + phase_plot)
-    return(data_pca)
+    return(data)
 }
 ```
 
 ```{r}
-E13_hom_pca = run_plot_PCA(E13_hom_normalised)
+E13_hom_norm = run_plot_PCA(E13_hom_norm)
 ```
 
 ```{r}
-E14_hom_pca = run_plot_PCA(E14_hom_normalised)
+E14_hom_norm = run_plot_PCA(E14_hom_norm)
 ```
 
-
-
 ```{r}
-E13_het_pca = run_plot_PCA(E13_het_normalised)
+E13_het_norm = run_plot_PCA(E13_het_norm)
 ```
 
-
 ```{r}
-E14_het_pca = run_plot_PCA(E14_het_normalised)
+E14_het_norm = run_plot_PCA(E14_het_norm)
 ```
 
 ## ElbowPlot to determine statistically significant PCs
@@ -298,7 +327,7 @@ E14_het_pca = run_plot_PCA(E14_het_normalised)
 ElbowPlot for E13_hom_pca. The plot is similar for the rest.
 
 ```{r}
-ElbowPlot(E13_hom_pca, ndims = 50)
+ElbowPlot(E13_hom_norm, ndims = 50)
 ```
 
 
@@ -323,52 +352,52 @@ run_umap = function(data, from_dimension, to_dimension) {
 
 
 ```{r message=FALSE, warning=FALSE}
-E13_hom_umap = run_umap(E13_hom_pca, 1, 30)
+E13_hom_norm = run_umap(E13_hom_norm, 1, 30)
 ```
 
 
 
 ```{r fig.width=5, fig.height=5}
 # Remove Cajal-Retzius cells -final E13_HOM plot:
-E13_hom_umap_subset = subset(E13_hom_umap, idents = c('9'), invert = TRUE)
-plot(DimPlot(E13_hom_umap_subset, label = TRUE) + labs(title = 'E13_HOM'))
+E13_hom_norm = subset(E13_hom_norm, idents = c('9'), invert = TRUE)
+plot(DimPlot(E13_hom_norm, label = TRUE) + labs(title = 'E13_HOM'))
 ```
 
 
 
 ```{r message=FALSE, warning=FALSE}
-E14_hom_umap = run_umap(E14_hom_pca, 1, 30)
+E14_hom_norm = run_umap(E14_hom_norm, 1, 30)
 ```
 
 ```{r fig.width=5, fig.height=5}
 # Remove Cajal-Retzius cells -final E14_HOM plot:
-E14_hom_umap_subset = subset(E14_hom_umap, idents = c('12'), invert = TRUE)
-plot(DimPlot(E14_hom_umap_subset, label = TRUE) + labs(title = 'E14_HOM'))
+E14_hom_norm = subset(E14_hom_norm, idents = c('12'), invert = TRUE)
+plot(DimPlot(E14_hom_norm, label = TRUE) + labs(title = 'E14_HOM'))
 ```
 
 
 
 ```{r message=FALSE, warning=FALSE}
-E13_het_umap = run_umap(E13_het_pca, 1, 30)
+E13_het_norm = run_umap(E13_het_norm, 1, 30)
 ```
 
 
 ```{r fig.width=5, fig.height=5}
 # Remove Cajal-Retzius cells -final E13_HET plot:
-E13_het_umap_subset = subset(E13_het_umap, idents = c('9'), invert = TRUE)
-plot(DimPlot(E13_het_umap_subset, label = TRUE) + labs(title = 'E13_HET'))
+E13_het_norm = subset(E13_het_norm, idents = c('9'), invert = TRUE)
+plot(DimPlot(E13_het_norm, label = TRUE) + labs(title = 'E13_HET'))
 ```
 
 
 ```{r message=FALSE, warning=FALSE}
-E14_het_umap = run_umap(E14_het_pca, 1, 30)
+E14_het_norm = run_umap(E14_het_norm, 1, 30)
 ```
 
 
 ```{r fig.width=5, fig.height=5}
 # Remove Cajal-Retzius cells -final E14_HET plot:
-E14_het_umap_subset = subset(E14_het_umap, idents = c('11'), invert = TRUE)
-plot(DimPlot(E14_het_umap_subset, label = TRUE) + labs(title = 'E14_HET'))
+E14_het_norm = subset(E14_het_norm, idents = c('11'), invert = TRUE)
+plot(DimPlot(E14_het_norm, label = TRUE) + labs(title = 'E14_HET'))
 ```
 
 
@@ -399,27 +428,27 @@ There are three major cell types in these datasets:
 3. **Post-mitotic neurons**, marker *Tbr1* --> mature cells that no longer undergo mitosis.
 
 ```{r}
-cell_type_markers = c('Pax6', 'Eomes', 'Tbr1')
+cell_type_markers = c('Pax6', 'Vim', 'Sox2', 'Eomes', 'Btg2', 'Tbr1', 'Sox5')
 ```
 
 
 ```{r}
-FeaturePlot(E13_hom_umap_subset, reduction='umap', features=cell_type_markers)
+FeaturePlot(E13_hom_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
 ```{r}
-FeaturePlot(E14_hom_umap_subset, reduction='umap', features=cell_type_markers)
+FeaturePlot(E14_hom_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
 ```{r}
-FeaturePlot(E13_het_umap_subset, reduction='umap', features=cell_type_markers)
+FeaturePlot(E13_het_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
 ```{r}
-FeaturePlot(E14_het_umap_subset, reduction='umap', features=cell_type_markers)
+FeaturePlot(E14_het_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
@@ -438,22 +467,22 @@ ectopic_markers = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'P
 
 
 ```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
-FeaturePlot(E13_hom_umap_subset, reduction='umap', features=ectopic_markers)
+FeaturePlot(E13_hom_norm, reduction='umap', features=ectopic_markers)
 ```
 
 
 ```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
-FeaturePlot(E14_hom_umap_subset, reduction='umap', features=ectopic_markers)
+FeaturePlot(E14_hom_norm, reduction='umap', features=ectopic_markers)
 ```
 
 
 ```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
-FeaturePlot(E13_het_umap_subset, reduction='umap', features=ectopic_markers)
+FeaturePlot(E13_het_norm, reduction='umap', features=ectopic_markers)
 ```
 
 
 ```{r fig.width=13, fig.height=7, message=FALSE, warning=FALSE}
-FeaturePlot(E14_het_umap_subset, reduction='umap', features=ectopic_markers)
+FeaturePlot(E14_het_norm, reduction='umap', features=ectopic_markers)
 ```
 
 
