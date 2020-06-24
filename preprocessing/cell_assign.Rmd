@@ -27,7 +27,8 @@ suppressPackageStartupMessages({
 ```
 
 ```{r}
-set.seed(1234)
+set.seed(1234)                # set R rng seed
+reticulate::py_set_seed(1234) # set python rng seed
 ```
 
 
@@ -36,7 +37,6 @@ set.seed(1234)
 
 ```{r}
 data_dir <- here('data_qc')
-print(data_dir)
 ```
 
 ```{r}
@@ -50,25 +50,25 @@ load_dataset <- function(file, name) {
 }
 ```
 
-Load HOM datasets (counts) after removal of unwanted cells from quality control
+Load HOM datasets (counts) after removal of unwanted cells from quality control - but before normalisation
 
 ```{r}
 E13_hom <- load_dataset(file.path(data_dir, 'E13_hom.csv'), 'E13_hom')
-E13_hom.data <- as.SingleCellExperiment(E13_hom)  # Convert to SingleCellExperiment class
+E13_hom.data <- as.SingleCellExperiment(E13_hom, assay = 'RNA')  # Convert to SingleCellExperiment class
 
 E14_hom <- load_dataset(file.path(data_dir, 'E14_hom.csv'), 'E14_hom')
-E14_hom.data <- as.SingleCellExperiment(E14_hom)  # Convert to SingleCellExperiment class
+E14_hom.data <- as.SingleCellExperiment(E14_hom, assay = 'RNA')  # Convert to SingleCellExperiment class
 ```
 
-
-
-`ComputeSumFactors` implements the deconvolution strategy for scaling normalisation of sparse count data.
 
 ```{r}
-E13_hom.data <- scran::computeSumFactors(E13_hom.data, min.mean = 0.1)
-E14_hom.data <- scran::computeSumFactors(E14_hom.data, min.mean = 0.1)
-```
+E13_het <- load_dataset(file.path(data_dir, 'E13_het.csv'), 'E13_het')
+E13_het.data <- as.SingleCellExperiment(E13_het)  # Convert to SingleCellExperiment class
 
+E14_het <- load_dataset(file.path(data_dir, 'E14_het.csv'), 'E14_het')
+E14_het.data <- as.SingleCellExperiment(E14_het)  # Convert to SingleCellExperiment class
+
+```
 
 # Assign cells to known cell types using cellassign
 
@@ -82,52 +82,19 @@ There are three major cell types in these datasets:
 
 ```{r}
 marker_list <- list(
-    `Neural progenitors` = c('Pax6', 'Vim', 'Sox2'),
     `Intermediate progenitors` = c('Eomes', 'Btg2'),
     `Post-mitotic neurons` = c('Tbr1', 'Sox5'),
-    `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3')
+    `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3'),
+    `Neural progenitors` = c('Pax6', 'Vim', 'Sox2')
 )
 ```
 
 
 Binary gene-by-celltype marker gene matrix
 
-```{r}
+```{r fig.width=7, fig.height=5}
 mgi <- marker_list_to_mat(marker_list, include_other = FALSE)
 pheatmap(mgi)
-```
-
-
-We make sure all of these markers exist in our dataset:
-Comment out:
-
-```{r}
-marker_in_E13_hom <- match(rownames(mgi), rownames(E13_hom))
-stopifnot(all(!is.na(marker_in_E13_hom)))
-
-marker_in_E14_hom <- match(rownames(mgi), rownames(E14_hom))
-stopifnot(all(!is.na(marker_in_E14_hom)))
-```
-
-
-
-We subset the seurat object to just the marker genes:
-
-```{r}
-E13_hom_marker <- E13_hom.data[marker_in_E13_hom, ]
-counts(E13_hom_marker) <- as.matrix(counts(E13_hom_marker))
-print(dim(E13_hom_marker))
-
-E14_hom_marker <- E14_hom.data[marker_in_E14_hom, ]
-counts(E14_hom_marker) <- as.matrix(counts(E14_hom_marker))
-print(dim(E14_hom_marker))
-```
-
-Remove entries that are not present in our dataset
-
-```{r}
-mgi_E13_hom <- mgi[rownames(mgi) %in% rownames(E13_hom.data), ]
-mgi_E14_hom <- mgi[rownames(mgi) %in% rownames(E14_hom.data), ]
 ```
 
 
@@ -137,17 +104,23 @@ mgi_E14_hom <- mgi[rownames(mgi) %in% rownames(E14_hom.data), ]
 Call `cellassign` passing the seurat object, marker info, the size factors
 
 ```{r}
-fit_E13_hom <- cellassign(exprs_obj = E13_hom.data[rownames(mgi_E13_hom), ],
-                          marker_gene_info = mgi,
-                          s = sizeFactors(E13_hom.data))
+fit_E13_hom <- em_result <- cellassign(E13_hom.data[rownames(mgi),],
+                                       marker_gene_info = mgi,
+                                       s = colSums(SummarizedExperiment::assay(E13_hom.data, "counts")),
+                                       shrinkage = TRUE,
+                                       verbose = FALSE)
 ```
 
-Add the cell types to the data object
+
+Add the cell types to the data object and visualize the probabilities of assignment using the cellprobs function that returns a probability matrix for each cell and cell type:
 
 ```{r}
 E13_hom.data$cell_type <- fit_E13_hom$cell_type
 plotUMAP(E13_hom.data, colour_by = 'cell_type')
-pheatmap(fit_E13_hom$mle_params$gamma)
+```
+
+```{r fig.width=7, fig.height=10}
+pheatmap(cellprobs(fit_E13_hom))
 ```
 
 
@@ -156,14 +129,79 @@ pheatmap(fit_E13_hom$mle_params$gamma)
 
 
 ```{r}
-fit_E14_hom <- cellassign(exprs_obj = E14_hom.data[rownames(mgi), ],
-                          marker_gene_info = mgi_E14_hom,
-                          s = sizeFactors(E14_hom.data))
+fit_E14_hom <- em_result <- cellassign(E14_hom.data[rownames(mgi),],
+                                       marker_gene_info = mgi,
+                                       s = colSums(SummarizedExperiment::assay(E14_hom.data, "counts")),
+                                       shrinkage = TRUE,
+                                       verbose = FALSE)
 ```
-
 
 ```{r}
 E14_hom.data$cell_type <- fit_E14_hom$cell_type
 plotUMAP(E14_hom.data, colour_by = 'cell_type')
-pheatmap(fit_E14_hom$mle_params$gamma)
+```
+
+
+```{r fig.width=7, fig.height=10}
+pheatmap(cellprobs(fit_E14_hom))
+```
+
+
+## E13_HET dataset
+
+```{r}
+fit_E13_het <- em_result <- cellassign(E13_het.data[rownames(mgi),],
+                                       marker_gene_info = mgi,
+                                       s = colSums(SummarizedExperiment::assay(E13_het.data, "counts")),
+                                       shrinkage = TRUE,
+                                       verbose = FALSE)
+```
+
+
+```{r}
+E13_het.data$cell_type <- celltypes(fit_E13_het)
+plotUMAP(E13_het.data, colour_by = 'cell_type')
+```
+
+```{r fig.width=7, fig.height=9}
+pheatmap(cellprobs(fit_E13_het))
+```
+
+
+## E14_HET dataset
+
+```{r}
+fit_E14_het <- em_result <- cellassign(E14_het.data[rownames(mgi),],
+                                       marker_gene_info = mgi,
+                                       s = colSums(SummarizedExperiment::assay(E14_het.data, "counts")),
+                                       shrinkage = TRUE,
+                                       verbose = FALSE)
+```
+
+
+```{r}
+E14_het.data$cell_type <- fit_E14_het$cell_type
+plotUMAP(E14_het.data, colour_by = 'cell_type')
+```
+
+```{r fig.width=7, fig.height=10}
+pheatmap(cellprobs(fit_E14_het))
+```
+
+
+# Write annotations to a csv file
+
+```{r}
+write_to_csv = function(sc_object, csv_name) {
+    df = data.frame(umi = colnames(sc_object),
+                    cell_type = sc_object[['cell_type']])
+    filepath = here('data_qc', csv_name)
+    write.csv(df, filepath, row.names = F)
+}
+```
+
+
+```{r}
+write_to_csv(E13_hom.data, 'anno_E13_hom.csv')
+write_to_csv(E14_hom.data, 'anno_E14_hom.csv')
 ```

@@ -45,8 +45,8 @@ load_dataset = function(file, name) {
 ```
 
 ```{r echo=FALSE}
-data_dir = file.path(dirname(getwd()), 'data')
-# or data_dir = here('data')
+# data_dir = file.path(dirname(getwd()), 'data')
+data_dir = here('data')
 ```
 
 
@@ -282,11 +282,11 @@ Dataset dimensions after SCTransform:
 | E14_het | 15,648 | 4,141 |
 
 
-Save normalised datasets
+Save normalised datasets after SCTransform
 
 ```{r}
-write_to_csv(E13_hom_norm, 'E13_hom_norm.csv')
-write_to_csv(E14_hom_norm, 'E14_hom_norm.csv')
+write_to_csv(E13_hom_norm, 'E13_hom_sctrans.csv')
+write_to_csv(E14_hom_norm, 'E14_hom_sctrans.csv')
 ```
 
 
@@ -421,33 +421,33 @@ Final dataset dimensions:
 
 There are three major cell types in these datasets:
 
-1. **Neural progenitors**, marker *Pax6* --> cells that are capable of dividing a limited number of times and have the capacity to differentiate into a restricted repertoire of neuronal and glial cell types.
+1. **Neural progenitors**, markers *Pax6, Vim, Sox2* --> cells that are capable of dividing a limited number of times and have the capacity to differentiate into a restricted repertoire of neuronal and glial cell types.
 
-2. **Intermediate progenitors**, marker *Eomes* --> a type of progenitor cells in the developing cerebral cortex, which produce neuron cells via a process known as neurogenesis. I
+2. **Intermediate progenitors**, markers *Eomes, Btg2* --> a type of progenitor cells in the developing cerebral cortex, which produce neuron cells via a process known as neurogenesis. I
 
-3. **Post-mitotic neurons**, marker *Tbr1* --> mature cells that no longer undergo mitosis.
+3. **Post-mitotic neurons**, markers *Tbr1, Sox5* --> mature cells that no longer undergo mitosis.
 
 ```{r}
 cell_type_markers = c('Pax6', 'Vim', 'Sox2', 'Eomes', 'Btg2', 'Tbr1', 'Sox5')
 ```
 
 
-```{r}
+```{r fig.width=10, fig.height=7}
 FeaturePlot(E13_hom_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
-```{r}
+```{r fig.width=10, fig.height=7}
 FeaturePlot(E14_hom_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
-```{r}
+```{r fig.width=10, fig.height=7}
 FeaturePlot(E13_het_norm, reduction='umap', features=cell_type_markers)
 ```
 
 
-```{r}
+```{r fig.width=10, fig.height=7}
 FeaturePlot(E14_het_norm, reduction='umap', features=cell_type_markers)
 ```
 
