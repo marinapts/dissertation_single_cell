@@ -18,14 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import pickle, os, numbers
-
+import pickle
 import numpy as np
 import scipy as sp
 import pandas as pd
 import scanpy.api as sc
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import scale
 
 
 #TODO: Fix this
@@ -43,8 +41,8 @@ class AnnSequence:
         return len(self.matrix) // self.batch_size
 
     def __getitem__(self, idx):
-        batch = self.matrix[idx*self.batch_size:(idx+1)*self.batch_size]
-        batch_sf = self.size_factors[idx*self.batch_size:(idx+1)*self.batch_size]
+        batch = self.matrix[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_sf = self.size_factors[idx * self.batch_size:(idx + 1) * self.batch_size]
 
         # return an (X, Y) pair
         return {'count': batch, 'size_factors': batch_sf}, batch
@@ -63,13 +61,14 @@ def read_dataset(adata, transpose=False, test_split=False, copy=False):
     norm_error = 'Make sure that the dataset (adata.X) contains unnormalized count data.'
     assert 'n_count' not in adata.obs, norm_error
 
-    if adata.X.size < 50e6: # check if adata.X is integer only if array is small
+    if adata.X.size < 50e6:  # check if adata.X is integer only if array is small
         if sp.sparse.issparse(adata.X):
             assert (adata.X.astype(int) != adata.X).nnz == 0, norm_error
         else:
             assert np.all(adata.X.astype(int) == adata.X), norm_error
 
-    if transpose: adata = adata.transpose()
+    if transpose:
+        adata = adata.transpose()
 
     if test_split:
         train_idx, test_idx = train_test_split(np.arange(adata.n_obs), test_size=0.1, random_state=42)
@@ -108,7 +107,9 @@ def normalize(adata, filter_min_counts=True, size_factors=True, normalize_input=
     if normalize_input:
         sc.pp.scale(adata)
 
+    print('Normalised data:', adata)
     return adata
+
 
 def read_genelist(filename):
     genelist = list(set(open(filename, 'rt').read().strip().split('\n')))
@@ -116,6 +117,7 @@ def read_genelist(filename):
     print('### Autoencoder: Subset of {} genes will be denoised.'.format(len(genelist)))
 
     return genelist
+
 
 def write_text_matrix(matrix, filename, rownames=None, colnames=None, transpose=False):
     if transpose:
@@ -126,6 +128,9 @@ def write_text_matrix(matrix, filename, rownames=None, colnames=None, transpose=
                                                                   sep='\t',
                                                                   index=(rownames is not None),
                                                                   header=(colnames is not None),
+
                                                                   float_format='%.6f')
+
+
 def read_pickle(inputfile):
     return pickle.load(open(inputfile, "rb"))

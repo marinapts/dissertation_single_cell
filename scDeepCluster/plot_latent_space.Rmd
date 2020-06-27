@@ -1,0 +1,82 @@
+---
+title: "Plot latent space from scDeepCluster"
+output:
+  html_notebook:
+    toc: yes
+    number_sections: yes
+    toc_float: no
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Rtsne)
+  library(ggplot2)
+  library(repr)
+  library(rhdf5)
+  library(dict)
+  library(plyr)
+  options(repr.plot.width=3, repr.plot.height=3)
+})
+```
+
+# E14_HOM
+
+Load annotations file and map cell types to numbers for clustering:
+
+```{r}
+labels_df = read.csv(file = '../data_qc/anno_E14_hom.csv', sep=',')
+cell_types = c('Neural progenitors', 'Intermediate progenitors', 'Post-mitotic neurons', 'Ectopic cells')
+mapping_nums = c(1, 2, 3, 4)
+Y = mapvalues(labels_df[['cell_type']], from=cell_types, to=mapping_nums)
+```
+
+
+```{r}
+latent.dat <- read.table("E14_hom_latent_output.csv", header = F, sep = ",")
+tsne.X <- Rtsne(latent.dat, max_iter = 1000)
+```
+
+```{r}
+# Y <- h5read("./scRNA_seq_data/mouse_ES_cell.h5", "Y")
+tsne_plot.X <- data.frame(`x-tsne` = tsne.X$Y[,1], `y-tsne` = tsne.X$Y[,2], truelabel = Y, check.names = F)
+tsne_plot.X$truelabel <- factor(tsne_plot.X$truelabel, levels = c(1:4))
+```
+
+```{r}
+ggplot(tsne_plot.X) + geom_point(aes(x=`x-tsne`, y=`y-tsne`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
+          labs(color='true label') +
+          ggtitle("scDeepCluster latent space") +
+          theme_bw() +
+          theme(panel.grid.major = element_blank())
+```
+
+
+
+# E13_HOM
+
+```{r}
+labels_df = read.csv(file = '../data_qc/anno_E13_hom.csv', sep=',')
+cell_types = c('Neural progenitors', 'Intermediate progenitors', 'Post-mitotic neurons', 'Ectopic cells')
+mapping_nums = c(1, 2, 3, 4)
+Y = mapvalues(labels_df[['cell_type']], from=cell_types, to=mapping_nums)
+
+latent.dat <- read.table("E13_hom_latent_output.csv", header = F, sep = ",")
+tsne.X <- Rtsne(latent.dat, max_iter = 1000)
+
+tsne_plot.X <- data.frame(`x-tsne` = tsne.X$Y[,1], `y-tsne` = tsne.X$Y[,2], truelabel = Y, check.names = F)
+tsne_plot.X$truelabel <- factor(tsne_plot.X$truelabel, levels = c(1:4))
+
+ggplot(tsne_plot.X) + geom_point(aes(x=`x-tsne`, y=`y-tsne`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
+          labs(color='true label') +
+          ggtitle("scDeepCluster latent space") +
+          theme_bw() +
+          theme(panel.grid.major = element_blank())
+```
+

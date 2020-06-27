@@ -8,7 +8,6 @@ from keras.models import Model
 import keras.backend as K
 from keras.engine.topology import Layer, InputSpec
 from keras.layers import Dense, Input, GaussianNoise, Layer, Activation
-from keras.models import Model
 from keras.optimizers import SGD, Adam
 
 import h5py
@@ -17,6 +16,7 @@ from layers import ConstantDispersionLayer, SliceLayer, ColWiseMultLayer
 from loss import poisson_loss, NB, ZINB
 from preprocess import read_dataset, normalize
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from numpy.random import seed
 seed(2211)
@@ -130,7 +130,6 @@ class ClusteringLayer(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-
 class SCDeepCluster(object):
     def __init__(self,
                  dims,
@@ -198,14 +197,8 @@ if __name__ == "__main__":
     parser.add_argument('--n_clusters', default=10, type=int)
     parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--data_file', default='data.h5')
-    parser.add_argument('--maxiter', default=2e4, type=int)
-    parser.add_argument('--pretrain_epochs', default=400, type=int)
-    parser.add_argument('--gamma', default=1, type=float,
-                        help='coefficient of clustering loss')
     parser.add_argument('--update_interval', default=0, type=int)
-    parser.add_argument('--tol', default=0.001, type=float)
     parser.add_argument('--scDeepCluster_weights', default='ae_weights.h5')
-    parser.add_argument('--save_dir', default='results/scDeepCluster')
     parser.add_argument('--latent_output', default='latent_output.csv')
 
     args = parser.parse_args()
@@ -214,27 +207,20 @@ if __name__ == "__main__":
     optimizer1 = Adam(amsgrad=True)
     optimizer2 = 'adadelta'
 
-    data_mat = h5py.File(args.data_file)
-    x = np.array(data_mat['X'])
-    y = np.array(data_mat['Y'])
+    # data_mat = h5py.File(args.data_file)
+    # x = np.array(data_mat['X'])
+    # y = np.array(data_mat['Y'])
 
-    adata = sc.AnnData(x)
-    adata.obs['Group'] = y
+    # adata = sc.AnnData(x)
+    # adata.obs['Group'] = y
 
-    adata = read_dataset(adata,
-                         transpose=False,
-                         test_split=False,
-                         copy=True)
+    expression_matrix = sc.read(args.data_file)
+    adata = sc.AnnData(expression_matrix)
 
-    adata = normalize(adata,
-                      size_factors=True,
-                      normalize_input=True,
-                      logtrans_input=True)
+    adata = read_dataset(adata, transpose=True, test_split=False, copy=True)
+    adata = normalize(adata, size_factors=True, normalize_input=True, logtrans_input=True)
 
     input_size = adata.n_vars
-
-    print(adata.X.shape)
-    print(y.shape)
 
     x_sd = adata.X.std(0)
     x_sd_median = np.median(x_sd)
@@ -259,5 +245,9 @@ if __name__ == "__main__":
     hidden_layer = scDeepCluster.model.get_layer(name='encoder_hidden').get_output_at(1)
     hidden_output_model = Model(inputs=scDeepCluster.model.input, outputs=hidden_layer)
     hidden_output = hidden_output_model.predict([adata.X, adata.obs.size_factors])
+
+    plt.scatter(hidden_output[:, 0], hidden_output[:, 1])
+    plt.savefig('latent_space_viz.pdf')
+
     hidden_output = np.asarray(hidden_output)
     np.savetxt(args.latent_output, hidden_output, delimiter=",")

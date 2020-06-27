@@ -22,6 +22,7 @@ from layers import ConstantDispersionLayer, SliceLayer, ColWiseMultLayer
 from loss import poisson_loss, NB, ZINB
 from preprocess import read_dataset, normalize
 import tensorflow as tf
+import pandas as pd
 
 from numpy.random import seed
 
@@ -30,6 +31,21 @@ tf.compat.v1.set_random_seed(2211)
 
 MeanAct = lambda x: tf.clip_by_value(K.exp(x), 1e-5, 1e6)
 DispAct = lambda x: tf.clip_by_value(tf.nn.softplus(x), 1e-4, 1e4)
+
+
+def map_labels_to_nums(labels):
+    mapping = {
+        'Neural progenitors': 1,
+        'Intermediate progenitors': 2,
+        'Post-mitotic neurons': 3,
+        'Ectopic cells': 4
+    }
+    num_labels = list()
+
+    for label in labels:
+        num_labels.append(mapping[label])
+
+    return np.array(num_labels, dtype=np.int64)
 
 
 def cluster_acc(y_true, y_pred):
@@ -233,8 +249,8 @@ class SCDeepCluster(object):
         weight = q ** 2 / q.sum(0)
         return (weight.T / weight.sum(1)).T
 
-    def fit(self, x_counts, sf, y, raw_counts, batch_size=256, maxiter=2e4, tol=1e-3, update_interval=140,
-            ae_weights=None, save_dir='./results/scDeepCluster', loss_weights=[1,1], optimizer='adadelta'):
+    def fit(self, X, x_counts, sf, y, raw_counts, batch_size=256, maxiter=2e4, tol=1e-3, update_interval=140,
+            ae_weights=None, save_dir='./results/scDeepCluster', loss_weights=[1, 1], optimizer='adadelta'):
 
         self.model.compile(loss=['kld', self.loss], loss_weights=loss_weights, optimizer=optimizer)
 
@@ -246,7 +262,7 @@ class SCDeepCluster(object):
         if not self.pretrained and ae_weights is None:
             print('...pretraining autoencoders using default hyper-parameters:')
             print('   optimizer=\'adam\';   epochs=200')
-            self.pretrain(x, batch_size)
+            self.pretrain(X, batch_size)
             self.pretrained = True
         elif ae_weights is not None:
             self.autoencoder.load_weights(ae_weights)
@@ -277,6 +293,7 @@ class SCDeepCluster(object):
 
                 # evaluate the clustering performance
                 self.y_pred = q.argmax(1)
+                print('y_pred', type(self.y_pred), self.y_pred)
                 if y is not None:
                     print('acc:', y, self.y_pred)
                     acc = np.round(cluster_acc(y, self.y_pred), 5)
@@ -333,6 +350,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_clusters', default=10, type=int)
     parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--data_file', default='data.h5')
+    parser.add_argument('--labels_file')
     parser.add_argument('--maxiter', default=2e4, type=int)
     parser.add_argument('--pretrain_epochs', default=400, type=int)
     parser.add_argument('--gamma', default=1, type=float,
@@ -349,29 +367,28 @@ if __name__ == "__main__":
     optimizer1 = Adam(amsgrad=True)
     optimizer2 = 'adadelta'
 
-    data_mat = h5py.File(args.data_file)
-    x = np.array(data_mat['X'])
-    y = np.array(data_mat['Y'])
+    # data_mat = h5py.File(args.data_file)
+    # x = np.array(data_mat['X'])
+    # y = np.array(data_mat['Y'])
 
     # preprocessing scRNA-seq read counts matrix
-    adata = sc.AnnData(x)
-    adata.obs['Group'] = y
+    # adata = sc.AnnData(x)
+    # adata.obs['Group'] = y
 
-    adata = read_dataset(adata,
-                         transpose=False,
-                         test_split=False,
-                         copy=True)
+    expression_matrix = sc.read(args.data_file)
 
-    adata = normalize(adata,
-                      size_factors=True,
-                      normalize_input=True,
-                      logtrans_input=True)
+    adata = sc.AnnData(expression_matrix)
+    adata = read_dataset(adata, transpose=True, test_split=False, copy=True)
+    adata = normalize(adata, size_factors=True, normalize_input=True, logtrans_input=True)
 
-    print('normalised:', adata)
+    labels = pd.read_csv(args.labels_file, sep=',')
+    cell_type_labels = list(labels['cell_type'])
+    y = map_labels_to_nums(cell_type_labels)
+    print('labels', len(y), y)
+
     input_size = adata.n_vars
-
     print(adata.X.shape)
-    print(y.shape)
+    # print(y.shape)
 
     x_sd = adata.X.std(0)
     x_sd_median = np.median(x_sd)
@@ -399,7 +416,12 @@ if __name__ == "__main__":
 
     # begin clustering, time not include pretraining part.
 
-    scDeepCluster.fit(x_counts=adata.X, sf=adata.obs.size_factors, y=y, raw_counts=adata.raw.X,
+    # scDeepCluster.fit(x_counts=adata.X, sf=adata.obs.size_factors, y=y, raw_counts=adata.raw.X,
+    #                   batch_size=args.batch_size, tol=args.tol, maxiter=args.maxiter,
+    #                   update_interval=args.update_interval, ae_weights=args.ae_weight_file,
+    #                   save_dir=args.save_dir, loss_weights=[args.gamma, 1], optimizer=optimizer2)
+
+    scDeepCluster.fit(X=adata, x_counts=adata.X, sf=adata.obs.size_factors, y=y, raw_counts=adata.raw.X,
                       batch_size=args.batch_size, tol=args.tol, maxiter=args.maxiter,
                       update_interval=args.update_interval, ae_weights=args.ae_weight_file,
                       save_dir=args.save_dir, loss_weights=[args.gamma, 1], optimizer=optimizer2)

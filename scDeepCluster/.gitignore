@@ -1,5 +1,6 @@
 .DS_Store
 .env/
+.git/
 scRNA_seq_data/
 model_weights/
-.git/
+network_structure/
