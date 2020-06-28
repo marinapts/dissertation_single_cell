@@ -21,7 +21,6 @@ numexpr==2.7.1
 numpy==1.18.2
 pandas==0.25.3
 patsy==0.5.1
-pkg-resources==0.0.0
 protobuf==3.12.2
 pyparsing==2.4.7
 python-dateutil==2.8.1

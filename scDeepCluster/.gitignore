@@ -1,6 +1,10 @@
 .DS_Store
+*.nb.html
+.Rhistory
+.RData
 .env/
 .git/
 scRNA_seq_data/
 model_weights/
 network_structure/
+code/__pycache__/

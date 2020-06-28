@@ -16,15 +16,75 @@ output:
 
 ```{r}
 suppressPackageStartupMessages({
-  library(Rtsne)
-  library(ggplot2)
-  library(repr)
-  library(rhdf5)
-  library(dict)
-  library(plyr)
-  options(repr.plot.width=3, repr.plot.height=3)
+    library(Rtsne)
+    library(ggplot2)
+    library(repr)
+    library(rhdf5)
+    library(dict)
+    library(plyr)
+    library(umap)
+    library(reticulate)
+    library(tensorflow)
+    options(repr.plot.width=3, repr.plot.height=3)
 })
 ```
+
+
+**Functions to run and plot tSNE and UMAP:**
+```{r}
+run_tsne = function(latent_data, Y, mapping_nums, cell_types) {
+    set.seed(42)
+    tsne.X <- Rtsne(latent_data, max_iter = 1000)
+    tsne_plot.X <- data.frame(`x-tsne` = tsne.X$Y[,1], `y-tsne` = tsne.X$Y[,2], truelabel = Y, check.names = F)
+    tsne_plot.X$truelabel <- factor(tsne_plot.X$truelabel, levels = c(1:4))
+  
+    return(tsne_plot.X)
+}
+```
+
+```{r}
+run_umap = function(latent_data, Y, mapping_nums, cell_types) {
+    set.seed(42)
+    umap_data = umap(latent_data, min_dist=0.001, n_neighbors=5, metric='cosine')
+    umap_df <- data.frame(x = umap_data$layout[,1], y = umap_data$layout[,2], truelabel = Y)
+    umap_df$truelabel <- factor(umap_df$truelabel, levels = c(1:4))
+    cluster_labels = mapvalues(Y, from=mapping_nums, to=cell_types)
+    
+    return(umap_df)
+}
+```
+
+```{r}
+plot_tsne_latent_space = function(df, mapping_nums, cell_types) {
+    plot = ggplot(df) + geom_point(
+        aes(x=`x-tsne`, y=`y-tsne`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
+        labs(color='Cell types') +
+        ggtitle("scDeepCluster latent space - tSNE") +
+        theme_bw() +
+        theme(panel.grid.major = element_blank())
+    return(plot)
+}
+```
+
+```{r}
+plot_umap_latent_space = function(df, mapping_nums, cell_types) {
+    plot = ggplot(df) + geom_point(
+        aes(x=`x`, y=`y`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
+        labs(color='Cell types') +
+        ggtitle("scDeepCluster latent space - UMAP") +
+        theme_bw() +
+        theme(panel.grid.major = element_blank())
+    return(plot)
+}
+```
+
+
+Define cell types and a mapping to numbers
+```{r}
+cell_types = c('Neural progenitors', 'Intermediate progenitors', 'Post-mitotic neurons', 'Ectopic cells')
+mapping_nums = c(1, 2, 3, 4)
+```
+
 
 # E14_HOM
 
@@ -32,51 +92,40 @@ Load annotations file and map cell types to numbers for clustering:
 
 ```{r}
 labels_df = read.csv(file = '../data_qc/anno_E14_hom.csv', sep=',')
-cell_types = c('Neural progenitors', 'Intermediate progenitors', 'Post-mitotic neurons', 'Ectopic cells')
-mapping_nums = c(1, 2, 3, 4)
 Y = mapvalues(labels_df[['cell_type']], from=cell_types, to=mapping_nums)
-```
-
-
-```{r}
 latent.dat <- read.table("E14_hom_latent_output.csv", header = F, sep = ",")
-tsne.X <- Rtsne(latent.dat, max_iter = 1000)
 ```
 
+## tSNE
 ```{r}
-# Y <- h5read("./scRNA_seq_data/mouse_ES_cell.h5", "Y")
-tsne_plot.X <- data.frame(`x-tsne` = tsne.X$Y[,1], `y-tsne` = tsne.X$Y[,2], truelabel = Y, check.names = F)
-tsne_plot.X$truelabel <- factor(tsne_plot.X$truelabel, levels = c(1:4))
+tsne_plot.X = run_tsne(latent.dat, Y, mapping_nums, cell_types)
+plot_tsne_latent_space(tsne_plot.X, mapping_nums, cell_types)
 ```
 
+## UMAP
 ```{r}
-ggplot(tsne_plot.X) + geom_point(aes(x=`x-tsne`, y=`y-tsne`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
-          labs(color='true label') +
-          ggtitle("scDeepCluster latent space") +
-          theme_bw() +
-          theme(panel.grid.major = element_blank())
+umap_df = run_umap(latent.dat, Y, mapping_nums, cell_types)
+plot_umap_latent_space(umap_df, mapping_nums, cell_types)
 ```
-
 
 
 # E13_HOM
 
 ```{r}
 labels_df = read.csv(file = '../data_qc/anno_E13_hom.csv', sep=',')
-cell_types = c('Neural progenitors', 'Intermediate progenitors', 'Post-mitotic neurons', 'Ectopic cells')
-mapping_nums = c(1, 2, 3, 4)
 Y = mapvalues(labels_df[['cell_type']], from=cell_types, to=mapping_nums)
-
 latent.dat <- read.table("E13_hom_latent_output.csv", header = F, sep = ",")
-tsne.X <- Rtsne(latent.dat, max_iter = 1000)
+```
 
-tsne_plot.X <- data.frame(`x-tsne` = tsne.X$Y[,1], `y-tsne` = tsne.X$Y[,2], truelabel = Y, check.names = F)
-tsne_plot.X$truelabel <- factor(tsne_plot.X$truelabel, levels = c(1:4))
+## tSNE
+```{r}
+tsne_plot.X = run_tsne(latent.dat, Y, mapping_nums, cell_types)
+plot_tsne_latent_space(tsne_plot.X, mapping_nums, cell_types)
+```
 
-ggplot(tsne_plot.X) + geom_point(aes(x=`x-tsne`, y=`y-tsne`, color=mapvalues(truelabel, from=mapping_nums, to=cell_types)), size=0.5) +
-          labs(color='true label') +
-          ggtitle("scDeepCluster latent space") +
-          theme_bw() +
-          theme(panel.grid.major = element_blank())
+## UMAP
+```{r}
+umap_df = run_umap(latent.dat, Y, mapping_nums, cell_types)
+plot_umap_latent_space(umap_df, mapping_nums, cell_types)
 ```
 
