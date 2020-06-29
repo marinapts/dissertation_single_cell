@@ -45,7 +45,7 @@ run_tsne = function(latent_data, Y, mapping_nums, cell_types) {
 ```{r}
 run_umap = function(latent_data, Y, mapping_nums, cell_types) {
     set.seed(42)
-    umap_data = umap(latent_data, min_dist=0.001, n_neighbors=5, metric='cosine')
+    umap_data = umap(latent_data, min_dist=0.8, n_neighbors=5, metric='euclidean')
     umap_df <- data.frame(x = umap_data$layout[,1], y = umap_data$layout[,2], truelabel = Y)
     umap_df$truelabel <- factor(umap_df$truelabel, levels = c(1:4))
     cluster_labels = mapvalues(Y, from=mapping_nums, to=cell_types)

@@ -1,5 +1,5 @@
 .DS_Store
-*.nb.html
+*.html
 .Rhistory
 .RData
 .env/
@@ -8,3 +8,4 @@ scRNA_seq_data/
 model_weights/
 network_structure/
 code/__pycache__/
+.ipynb_checkpoints/
