@@ -8,3 +8,5 @@ preprocessing/plots_*/
 preprocessing/rds_*/
 preprocessing/.Rhistory
 preprocessing/*.html
+preprocessing/.ipynb_checkpoints/
+preprocessing/cache/
