@@ -11,3 +11,6 @@ preprocessing/*.html
 preprocessing/.ipynb_checkpoints/
 preprocessing/cache/
 ann_data/
+
+scanpy_preprocess/.ipynb_checkpoints/
+scanpy_preprocess/*.html
