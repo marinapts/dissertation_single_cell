@@ -4,8 +4,11 @@
 .RData
 .env/
 .git/
+*_latent_output.csv
 scRNA_seq_data/
 model_weights/
 network_structure/
 code/__pycache__/
 .ipynb_checkpoints/
+results/
+weights/
