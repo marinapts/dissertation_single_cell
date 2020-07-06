@@ -12,3 +12,4 @@ code/__pycache__/
 .ipynb_checkpoints/
 results/
 weights/
+exp_0*/
