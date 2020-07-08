@@ -2,8 +2,10 @@
 Implementation of scDeepCluster for scRNA-seq data
 """
 
-from time import time
 import numpy as np
+import csv
+import os
+from time import time
 from keras.models import Model
 import keras.backend as K
 from keras.engine.topology import Layer, InputSpec
@@ -228,7 +230,7 @@ class SCDeepCluster(object):
     def pretrain(self, x, y, batch_size=256, epochs=200, optimizer='adam', ae_file='ae_weights.h5'):
         print('...Pretraining autoencoder...')
         self.autoencoder.compile(loss=self.loss, optimizer=optimizer)
-        es = EarlyStopping(monitor="loss", patience=50, verbose=1)
+        es = EarlyStopping(monitor="loss", patience=5, verbose=1)
         self.autoencoder.fit(x=x, y=y, batch_size=batch_size, epochs=epochs, callbacks=[es])
         self.autoencoder.save_weights(ae_file)
         print('Pretrained weights are saved to ./' + str(ae_file))
@@ -277,7 +279,6 @@ class SCDeepCluster(object):
 
         # Step 3: deep clustering
         # logging file
-        import csv, os
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         logfile = open(save_dir + '/scDeepCluster_log.csv', 'w')
@@ -350,7 +351,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_clusters', default=10, type=int)
     parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--data_file', default='data.h5')
-    parser.add_argument('--labels_file')
+    parser.add_argument('--labels_file', default=None)
     parser.add_argument('--maxiter', default=2e4, type=int)
     parser.add_argument('--pretrain_epochs', default=400, type=int)
     parser.add_argument('--gamma', default=1, type=float,
@@ -375,20 +376,26 @@ if __name__ == "__main__":
     # adata = sc.AnnData(x)
     # adata.obs['Group'] = y
 
-    expression_matrix = sc.read(args.data_file)
-
+    # expression_matrix = sc.read(args.data_file)
+    expression_matrix = sc.read_h5ad(args.data_file)
     adata = sc.AnnData(expression_matrix)
-    adata = read_dataset(adata, transpose=True, test_split=False, copy=True)
-    adata = normalize(adata, size_factors=True, normalize_input=True, logtrans_input=True)
 
-    labels = pd.read_csv(args.labels_file, sep=',')
-    cell_type_labels = list(labels['cell_type'])
-    y = map_labels_to_nums(cell_type_labels)
-    print('labels', len(y), y)
+    adata = read_dataset(adata, transpose=False, test_split=False, copy=True)
+    adata = normalize(adata, filter_min_counts=False, size_factors=False, normalize_input=False, logtrans_input=False)
+
+    if args.labels_file is None:
+        y = None
+    else:
+        labels = pd.read_csv(args.labels_file, sep=',')
+        cell_type_labels = list(labels['cell_type'])
+        y = map_labels_to_nums(cell_type_labels)
+        print('labels', len(y), y)
 
     input_size = adata.n_vars
-    print(adata.X.shape)
-    # print(y.shape)
+    print('shape:', adata.X.shape)
+
+    print('adata.X:', adata.X[100])
+    print('adata.raw.X:', adata.raw.X[100])
 
     x_sd = adata.X.std(0)
     x_sd_median = np.median(x_sd)
@@ -399,8 +406,8 @@ if __name__ == "__main__":
     print(args)
 
     # Define scDeepCluster model
-    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 32], n_clusters=args.n_clusters, noise_sd=2.5)
-    plot_model(scDeepCluster.model, to_file='scDeepCluster_model.png', show_shapes=True)
+    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 32], n_clusters=args.n_clusters, noise_sd=2.5, debug=True)
+    # plot_model(scDeepCluster.model, to_file='scDeepCluster_model.png', show_shapes=True)
     print("autocoder summary")
     scDeepCluster.autoencoder.summary()
     print("model summary")
@@ -409,7 +416,6 @@ if __name__ == "__main__":
     t0 = time()
 
     # Pretrain autoencoders before clustering
-    print('-----------------', adata.raw.X[0])
     if args.ae_weights is None:
         scDeepCluster.pretrain(x=[adata.X, adata.obs.size_factors], y=adata.raw.X, batch_size=args.batch_size,
                                epochs=args.pretrain_epochs, optimizer=optimizer1, ae_file=args.ae_weight_file)
@@ -427,9 +433,10 @@ if __name__ == "__main__":
                       save_dir=args.save_dir, loss_weights=[args.gamma, 1], optimizer=optimizer2)
 
     # Show the final results
-    y_pred = scDeepCluster.y_pred
-    acc = np.round(cluster_acc(y, scDeepCluster.y_pred), 5)
-    nmi = np.round(metrics.normalized_mutual_info_score(y, scDeepCluster.y_pred), 5)
-    ari = np.round(metrics.adjusted_rand_score(y, scDeepCluster.y_pred), 5)
-    print('Final: ACC= %.4f, NMI= %.4f, ARI= %.4f' % (acc, nmi, ari))
-    print('Clustering time: %d seconds.' % int(time() - t0))
+    if y is not None:
+        y_pred = scDeepCluster.y_pred
+        acc = np.round(cluster_acc(y, scDeepCluster.y_pred), 5)
+        nmi = np.round(metrics.normalized_mutual_info_score(y, scDeepCluster.y_pred), 5)
+        ari = np.round(metrics.adjusted_rand_score(y, scDeepCluster.y_pred), 5)
+        print('Final: ACC= %.4f, NMI= %.4f, ARI= %.4f' % (acc, nmi, ari))
+        print('Clustering time: %d seconds.' % int(time() - t0))

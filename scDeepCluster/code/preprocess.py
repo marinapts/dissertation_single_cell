@@ -92,8 +92,8 @@ def normalize(adata, filter_min_counts=True, size_factors=True, normalize_input=
 
     if size_factors or normalize_input or logtrans_input:
         adata.raw = adata.copy()
-    else:
-        adata.raw = adata
+    # else:
+        # adata.raw = adata
 
     if size_factors:
         sc.pp.normalize_per_cell(adata)

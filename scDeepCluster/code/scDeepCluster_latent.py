@@ -214,11 +214,12 @@ if __name__ == "__main__":
     # adata = sc.AnnData(x)
     # adata.obs['Group'] = y
 
-    expression_matrix = sc.read(args.data_file)
+    # expression_matrix = sc.read(args.data_file)
+    expression_matrix = sc.read_h5ad(args.data_file)
     adata = sc.AnnData(expression_matrix)
 
-    adata = read_dataset(adata, transpose=True, test_split=False, copy=True)
-    adata = normalize(adata, size_factors=True, normalize_input=True, logtrans_input=True)
+    adata = read_dataset(adata, transpose=False, test_split=False, copy=True)
+    adata = normalize(adata, filter_min_counts=False, size_factors=False, normalize_input=False, logtrans_input=False)
 
     input_size = adata.n_vars
 
