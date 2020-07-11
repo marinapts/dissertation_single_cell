@@ -96,7 +96,7 @@ def normalize(adata, filter_min_counts=True, size_factors=True, normalize_input=
         # adata.raw = adata
 
     if size_factors:
-        sc.pp.normalize_per_cell(adata)
+        sc.pp.normalize_total(adata)
         adata.obs['size_factors'] = adata.obs.n_counts / np.median(adata.obs.n_counts)
     else:
         adata.obs['size_factors'] = 1.0

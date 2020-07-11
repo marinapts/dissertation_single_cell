@@ -219,7 +219,7 @@ if __name__ == "__main__":
     adata = sc.AnnData(expression_matrix)
 
     adata = read_dataset(adata, transpose=False, test_split=False, copy=True)
-    adata = normalize(adata, filter_min_counts=False, size_factors=False, normalize_input=False, logtrans_input=False)
+    # adata = normalize(adata, filter_min_counts=False, size_factors=False, normalize_input=False, logtrans_input=False)
 
     input_size = adata.n_vars
 
