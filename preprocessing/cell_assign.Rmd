@@ -36,7 +36,7 @@ reticulate::py_set_seed(1234) # set python rng seed
 # Load 10X scRNA-seq data from csv files
 
 ```{r}
-data_dir <- here('data_qc')
+data_dir <- here('ann_data')
 ```
 
 ```{r}
@@ -56,8 +56,12 @@ Load HOM datasets (counts) after removal of unwanted cells from quality control 
 E13_hom <- load_dataset(file.path(data_dir, 'E13_hom.csv'), 'E13_hom')
 E13_hom.data <- as.SingleCellExperiment(E13_hom, assay = 'RNA')  # Convert to SingleCellExperiment class
 
-E14_hom <- load_dataset(file.path(data_dir, 'E14_hom.csv'), 'E14_hom')
+E14_hom <- load_dataset(file.path(data_dir, 'E14_hom_qc.csv'), 'E14_hom')
 E14_hom.data <- as.SingleCellExperiment(E14_hom, assay = 'RNA')  # Convert to SingleCellExperiment class
+```
+
+```{r}
+print(E14_hom.data)
 ```
 
 

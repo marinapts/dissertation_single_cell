@@ -58,13 +58,18 @@ def read_dataset(adata, transpose=False, test_split=False, copy=False):
     else:
         raise NotImplementedError
 
+    print('\n n_count', 'n_count' in adata.obs)
+    print()
     norm_error = 'Make sure that the dataset (adata.X) contains unnormalized count data.'
     assert 'n_count' not in adata.obs, norm_error
 
+    print('size', adata.X.size)
     if adata.X.size < 50e6:  # check if adata.X is integer only if array is small
         if sp.sparse.issparse(adata.X):
+            print('sparse')
             assert (adata.X.astype(int) != adata.X).nnz == 0, norm_error
         else:
+            print('not sparse')
             assert np.all(adata.X.astype(int) == adata.X), norm_error
 
     if transpose:
