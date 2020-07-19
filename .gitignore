@@ -14,3 +14,5 @@ ann_data/
 
 scanpy_preprocess/.ipynb_checkpoints/
 scanpy_preprocess/*.html
+
+cellassign_img/
