@@ -47,11 +47,7 @@ fit_E14_hom <- cellassign(exprs_obj = E14_hom[rownames(mgi),],
 E14_hom$cell_type <- fit_E14_hom$cell_type
 plotUMAP(E14_hom, colour_by = 'cell_type')
 
-# Now that we have the cell types in the SingleCellExperiment object, we convert back to Seurat because it's easier
-# to store the object in an h5ad file
-E14_hom_seurat <- as.Seurat(E14_hom)
-write.csv(x = E14_hom_seurat$cell_type, file = file.path(data_dir, 'E14_hom_cellassign.csv'), row.names = TRUE)
-
-
-
-
+# Convert SCE object to a dataframe and save UMIs and cell types to a csv file
+df = data.frame(umi = colnames(E14_hom), cell_type = E14_hom[['cell_type']])
+csv_anno = file.path(data_dir, 'E14_hom_cellassign.csv')
+write.csv(df, file=csv_anno, row.names = F)
