@@ -14,9 +14,10 @@ reticulate::py_set_seed(1234) # set python rng seed
 
 data_dir <- here('ann_data/exp_04')
 
-h5ad_file <- file.path(data_dir, 'E14_hom_norm_all_genes.h5ad')
+dataset <- 'E13_hom_norm_all_genes'
+h5ad_file <- file.path(data_dir, paste0(dataset, '.h5ad'))
 Convert(h5ad_file, dest = 'h5seurat', overwrite = TRUE)
-E14_hom <- LoadH5Seurat(file.path(data_dir, 'E14_hom_norm_all_genes.h5seurat'))
+E14_hom <- LoadH5Seurat(file.path(data_dir, paste0(dataset, '.h5seurat')))
 E14_hom <- as.SingleCellExperiment(E14_hom, assay = 'RNA')  # Convert to SingleCellExperiment class
 E14_hom <- computeSumFactors(E14_hom)
 sfactors <- sizeFactors(E14_hom)
@@ -25,8 +26,8 @@ marker_list <- list(
     `Neural progenitors` = c('Pax6', 'Vim', 'Sox2'),
     `Intermediate progenitors` = c('Eomes', 'Btg2'),
     `Post-mitotic neurons` = c('Tbr1', 'Sox5'),
-    `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3')
-    # `Ectopic cells` = c('Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Msx3')
+    # `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3')
+    `Ectopic cells` = c('Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt')
 )
 
 # Construct binary gene-by-celltype marker gene matrix
@@ -49,5 +50,5 @@ plotUMAP(E14_hom, colour_by = 'cell_type')
 
 # Convert SCE object to a dataframe and save UMIs and cell types to a csv file
 df = data.frame(umi = colnames(E14_hom), cell_type = E14_hom[['cell_type']])
-csv_anno = file.path(data_dir, 'E14_hom_cellassign.csv')
+csv_anno = file.path(data_dir, 'annotations/E13_hom_cellassign.csv')
 write.csv(df, file=csv_anno, row.names = F)

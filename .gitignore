@@ -1,4 +1,7 @@
 sftp-config.json
+.RData
+.Rhistory
+
 data/
 data_qc/
 plots/
@@ -13,6 +16,7 @@ preprocessing/cache/
 ann_data/
 
 scanpy_preprocess/.ipynb_checkpoints/
-scanpy_preprocess/*.html
+scanpy_preprocess/notebooks/
+scanpy_preprocess/notebooks_old/
 
 cellassign_img/
