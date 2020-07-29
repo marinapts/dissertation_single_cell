@@ -5,16 +5,29 @@ in the cerebral cortex of mouse embryos.
 
 We have gene expression values in single cells for the embryonic days E13 and E14 for controls and knockouts.
 
-> Knockouts (*Homozygous mutant*): `E13_HOM`, `E14_HOM`
+> Knockouts (*Homozygous mutant*): `E13_hom`, `E14_hom`
 
-> Controls (*Heterozygous control*): `E13_HET`, `E14_HET`
+> Controls (*Heterozygous control*): `E13_het`, `E14_het`
 
 TODO list:
 - [x] Preprocessing
 - [x] Assign cell types
-- [ ] Differential expression analysis
+- [x] Differential expression analysis
 - [x] scDeepCluster - AE
 - [ ] sci... variational AE
+
+
+## Pipeline
+
+Preprocess datasets that exist under the data directory. New h5ad files (all genes or only highly variable genes)
+are saved in *ann_data*.
+
+```bash
+python scanpy_preprocess/preprocess.py --dataset E13_hom --keep_only_highly_variable --write_to_file
+```
+
+Setting the flag `--keep_only_highly_variable` produces the files `ann_data/E1*_hom_variable_genes.h5ad` while
+if we don't pass the parameter then it produces `ann_data/E1*_hom_all_genes.h5ad`.
 
 
 ### Preprocessing using Scanpy
