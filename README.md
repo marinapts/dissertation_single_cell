@@ -19,6 +19,7 @@ TODO list:
 
 ## Pipeline
 
+### Preprocessing
 Preprocess datasets that exist under the data directory. New h5ad files (all genes or only highly variable genes)
 are saved in *ann_data*.
 
@@ -28,6 +29,12 @@ python scanpy_preprocess/preprocess.py --dataset E13_hom --keep_only_highly_vari
 
 Setting the flag `--keep_only_highly_variable` produces the files `ann_data/E1*_hom_variable_genes.h5ad` while
 if we don't pass the parameter then it produces `ann_data/E1*_hom_all_genes.h5ad`.
+
+### Data Integration - HOMs
+
+```bash
+python scanpy_preprocess/integration.py --dataset_type variable --write_to_file
+```
 
 
 ### Preprocessing using Scanpy
