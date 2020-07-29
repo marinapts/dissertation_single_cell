@@ -36,6 +36,11 @@ if we don't pass the parameter then it produces `ann_data/E1*_hom_all_genes.h5ad
 python scanpy_preprocess/integration.py --dataset_type variable --write_to_file
 ```
 
+### Differential expression and cell-type annotation
+
+```bash
+ python scanpy_preprocess/marker_genes.py --dataset E14_hom --dataset_type variable  --update_file
+```
 
 ### Preprocessing using Scanpy
 `scanpy_preprocess/preprocess.ipynb`

@@ -1,21 +1,14 @@
 import scanpy as sc
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 import argparse
-from matplotlib import colors
 from pathlib import Path
+from utils import get_colormap, get_known_marker_genes
 
 sc.logging.print_versions()
 sc.set_figure_params(facecolor="white", figsize=(6, 4))
 sc.settings.verbosity = 3
 np.random.seed(2211)
-
-# Define a nice colour map for gene expression
-colors2 = plt.cm.Reds(np.linspace(0, 1, 128))
-colors3 = plt.cm.Greys_r(np.linspace(0.7, 0.8, 20))
-colorsComb = np.vstack([colors3, colors2])
-mymap = colors.LinearSegmentedColormap.from_list('my_colormap', colorsComb)
 
 
 def plot_qc_measures(adata):
@@ -115,19 +108,17 @@ def plot_marker_genes(adata, marker_genes, main_cell_types):
     vmin = -5
     vmax = 5
 
-    print('3 cell types:')
-    sc.pl.umap(adata, color=main_cell_types, cmap=mymap, legend_loc='on data', size=50, ncols=3,
-               vmin=vmin, vmax=vmax,
-               use_raw=use_raw)
+    # print('3 cell types:')
+    # sc.pl.umap(adata, color=main_cell_types, cmap=get_colormap(), legend_loc='on data', size=50, ncols=3,
+    #            vmin=vmin, vmax=vmax, use_raw=use_raw)
 
-    print('Ectopic:')
-    sc.pl.umap(adata, color=available_ectopic, cmap=mymap, size=50, ncols=3,
-               vmin=vmin, vmax=vmax,
-               use_raw=use_raw)
+    # print('Ectopic:')
+    # sc.pl.umap(adata, color=available_ectopic, cmap=get_colormap(), size=50, ncols=3,
+    #            vmin=vmin, vmax=vmax, use_raw=use_raw)
 
     # Print all in one image
-    # sc.pl.umap(adata, color=main_cell_types + list(available_ectopic), cmap=mymap, size=50,
-    #            vmin=vmin, vmax=vmax, use_raw=False)
+    sc.pl.umap(adata, color=main_cell_types + list(available_ectopic), cmap=get_colormap(), size=50,
+               vmin=vmin, vmax=vmax, use_raw=use_raw)
 
 
 def plot_heatmap_dotplot(adata, marker_genes, main_cell_types, available_ectopic):
@@ -151,13 +142,12 @@ def plot_heatmap_dotplot(adata, marker_genes, main_cell_types, available_ectopic
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Preprocessing of single-cell RNA-seq datasets')
     parser.add_argument('--dataset', type=str, default='E13_hom', help='Path to the csv file')
-    parser.add_argument('--keep_only_highly_variable', action='store_true',
-                        help='Whether to only keep ONLY highly variable genes or all genes')
-    parser.add_argument('--show_qc_plots', help='Whether to show quality control plot or not')
-    parser.add_argument('--show_pca_plots', help='Whether to show pca plots or not')
-    parser.add_argument('--show_cell_cycle_plots', help='Whether to show cell cycle plots or not')
-    parser.add_argument('--show_marker_genes_plots', help='Whether to show expression plots for each marker gene')
-    parser.add_argument('--show_extra_plots', help='Whether to show extra heatmaps and dotplots')
+    parser.add_argument('--keep_only_highly_variable', action='store_true', help='Whether to only keep ONLY highly variable genes or all genes')
+    parser.add_argument('--show_qc_plots', action='store_true', help='Whether to show quality control plot or not')
+    parser.add_argument('--show_pca_plots', action='store_true', help='Whether to show pca plots or not')
+    parser.add_argument('--show_cell_cycle_plots', action='store_true', help='Whether to show cell cycle plots or not')
+    parser.add_argument('--show_marker_genes_plots', action='store_true', help='Whether to show expression plots for each marker gene')
+    parser.add_argument('--show_extra_plots', action='store_true', help='Whether to show extra heatmaps and dotplots')
     parser.add_argument('--write_to_file', action='store_true', help='Write preprocess data to h5ad file')
     args = parser.parse_args()
 
@@ -192,19 +182,7 @@ if __name__ == '__main__':
     # plot_cell_cycle_after_regression(adata, cell_cycle_genes)
     adata = clustering(adata, args.dataset, args.keep_only_highly_variable)
 
-    # Marker genes
-    marker_genes = dict()
-    marker_genes['neural_progen'] = ['Pax6', 'Vim', 'Sox2'] if args.dataset == 'E14_hom' else ['Pax6', 'Sox2']
-    marker_genes['intermediate_progen'] = ['Eomes', 'Btg2']
-    marker_genes['post_mitotic'] = ['Tbr1', 'Sox5']
-    marker_genes['ectopic'] = ['Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3']
-
-    main_cell_types = marker_genes['neural_progen'] + marker_genes['intermediate_progen'] + marker_genes['post_mitotic']
-    var_names = set(adata.var_names)
-    columns = set(adata.obs.columns)
-    gene_names = var_names.union(columns)
-    available_ectopic = gene_names.intersection(marker_genes['ectopic'])
-
+    marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
     if args.show_marker_genes_plots:
         plot_marker_genes(adata, marker_genes, main_cell_types)
 
