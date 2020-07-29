@@ -13,3 +13,4 @@ code/__pycache__/
 results/
 weights/
 exp_0*/
+bottleneck/

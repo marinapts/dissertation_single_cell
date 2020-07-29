@@ -18,6 +18,7 @@ ann_data/
 scanpy_preprocess/.ipynb_checkpoints/
 scanpy_preprocess/notebooks/
 scanpy_preprocess/notebooks_old/
+scanpy_preprocess/__pycache__/
 
 cellassign_img/
 DEGs/
