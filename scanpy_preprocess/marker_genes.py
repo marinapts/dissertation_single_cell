@@ -5,7 +5,7 @@ import numpy as np
 import seaborn as sb
 import argparse
 from pathlib import Path
-from utils import get_colormap, get_known_marker_genes
+from utils import get_colormap, get_known_marker_genes, probability_distr_of_overlap
 
 sc.logging.print_versions()
 sc.set_figure_params(facecolor="white", figsize=(8, 4))
@@ -44,7 +44,8 @@ def differential_expression(adata, clusters_key, n_genes, show_extra_de_plots, D
     print(top_ranked_genes_per_cluster.head(20))
 
     # Write top_n_genes for each cluster in a csv file
-    top_ranked_genes_per_cluster.to_csv(DEGs_file)
+    if DEGs_file is not None:
+        top_ranked_genes_per_cluster.to_csv(DEGs_file)
 
     if show_extra_de_plots:
         sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, use_raw=use_raw, swap_axes=True,
@@ -126,6 +127,8 @@ if __name__ == '__main__':
     ranked_genes = differential_expression(adata, clusters_key, top_n_genes, args.plot_diff_expression, DEGs_file)
     # Get overlap of known marker genes with the marker genes found from DE
     gene_overlap_norm = marker_gene_overlap(adata, ranked_genes)
+    gene_overlap_norm_distr = probability_distr_of_overlap(gene_overlap_norm)
+
     # Annotate clusters
     adata.obs[clusters_key + '_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm)
     sc.pl.umap(adata, color=[clusters_key + '_annotations'])

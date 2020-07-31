@@ -26,3 +26,17 @@ def get_known_marker_genes(adata):
     available_ectopic = gene_names.intersection(marker_genes['ectopic'])
 
     return marker_genes, main_cell_types, available_ectopic
+
+
+def probability_distr_of_overlap(gene_overlap_norm):
+    """Converts the gene overlap matrix of known marker genes with the DE genes
+    so that each cluster is a probability distribution over the cell types.
+    Each value is the percentage of cells in that cluster belong to a cell type (assumption based on the overlap)
+    """
+    gene_overlap_norm_distr = gene_overlap_norm.copy()
+    for cl in gene_overlap_norm.columns:
+        gene_overlap_norm_distr[cl] = np.nan_to_num(gene_overlap_norm[cl] / sum(gene_overlap_norm[cl]))
+
+    print(gene_overlap_norm_distr)
+
+    return gene_overlap_norm_distr
