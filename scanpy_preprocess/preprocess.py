@@ -2,19 +2,70 @@ import scanpy as sc
 import pandas as pd
 import numpy as np
 import argparse
+import seaborn as sns
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from pathlib import Path
-from utils import get_colormap, get_known_marker_genes
+# from utils import get_colormap, get_known_marker_genes
 
 sc.logging.print_versions()
-sc.set_figure_params(facecolor="white", figsize=(6, 4))
+# sc.set_figure_params(facecolor="white", figsize=(6, 4))
 sc.settings.verbosity = 3
 np.random.seed(2211)
+sns.set(style='whitegrid')
+# Create an array with the colors you want to use
+colors = ["#3498db", "#9b59b6", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
+sns.set_palette(sns.color_palette(colors))  # Set your custom color palette
 
 
 def plot_qc_measures(adata):
-    sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts', 'pct_counts_mt'], jitter=0.7, multi_panel=True)
+    # sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts', 'pct_counts_mt'], jitter=0.7, multi_panel=True,
+    #              xlabel='test', name=['1', '2', '3'])
     sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt')
     sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts')
+
+
+def plot_qc_distplot(adata):
+    mpl.rcParams['axes.titlesize'] = 18
+    mpl.rcParams['axes.labelsize'] = 14
+    mpl.rcParams['xtick.labelsize'] = 12
+    mpl.rcParams['ytick.labelsize'] = 12
+    mpl.rcParams['figure.titlesize'] = 18
+
+    keys = ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']
+    key_names = ['Number of genes with counts per cell', 'Total number of genes counts per cell',
+                 'Proportion of total mitochondrial counts per cell']
+
+    fig, axs = plt.subplots(1, len(keys), figsize=(10, 3))
+    for idx, k in enumerate(keys):
+        sns.distplot(adata.obs[k], ax=axs[idx], axlabel=key_names[idx], hist=True)
+        axs[idx].set_ylabel('Proportion of cells')
+    fig.tight_layout()
+    fig.show()
+
+    # Violin plots
+    titles_2 = ['Number of genes with positive counts per cell', 'Total number of genes counts per cell',
+                'Total mitochondrial counts per cell']
+    ylabels_2 = ['Number of genes', 'Number of genes', 'Number of mitochondrial genes']
+
+    fig2, axs2 = plt.subplots(1, len(keys), figsize=(15, 3))
+    for idx, k in enumerate(keys):
+        sns.violinplot(data=adata.obs[k], ax=axs2[idx])
+        sns.stripplot(data=adata.obs[k], ax=axs2[idx], jitter=0.7, color='black', size=2)
+        axs2[idx].set_ylabel(ylabels_2[idx])
+        axs2[idx].set_title(titles_2[idx])
+    fig2.tight_layout()
+    fig2.show()
+
+    # Scatter plot
+    scatter_keys = ['n_genes_by_counts', 'pct_counts_mt']
+    fig3, axs3 = plt.subplots(1, len(scatter_keys), figsize=(15, 3))
+    for idx, k in enumerate(scatter_keys):
+        sns.scatterplot(data=adata.obs, x='total_counts', y=k, ax=axs3[idx], markers=True)
+        # axs3[idx].set_ylabel(ylabels_2[idx])
+        # axs3[idx].set_title(titles_2[idx])
+    fig3.tight_layout()
+    fig3.show()
 
 
 def normalise_data(adata, keep_only_highly_variable=True):
@@ -151,6 +202,13 @@ if __name__ == '__main__':
     parser.add_argument('--write_to_file', action='store_true', help='Write preprocess data to h5ad file')
     args = parser.parse_args()
 
+    args.show_qc_plots = True
+    args.show_pca_plots = True
+    args.show_cell_cycle_plots = True
+    args.show_marker_genes_plots = True
+    args.show_extra_plots = True
+    args.write_to_file = True
+
     dataset_path = Path('data', args.dataset + '.csv')
     print('Reading single-cell csv file: ', dataset_path)
     data = pd.read_csv(dataset_path, index_col=0)
@@ -158,12 +216,16 @@ if __name__ == '__main__':
     print(adata)
 
     # Quality Control
-    sc.pp.filter_cells(adata, min_genes=200)
-    sc.pp.filter_genes(adata, min_cells=3)
+    print('---Quality control')
     adata.var['mt'] = adata.var_names.str.startswith('mt-')  # annotate the group of mitochondrial genes as 'mt'
     sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)  # compute QC metrics
+    print('# genes with 0 counts:', adata[:, adata.var['total_counts'] == 0].shape[1])
+
+    sc.pp.filter_cells(adata, min_genes=200)
+    sc.pp.filter_genes(adata, min_cells=3)
 
     if args.show_qc_plots:
+        plot_qc_distplot(adata)
         plot_qc_measures(adata)
 
     # Remove cells with certain threshold
@@ -173,15 +235,19 @@ if __name__ == '__main__':
     raw_counts = adata.copy()
 
     # Normalisation
+    print('---Normalisation')
     adata = normalise_data(adata, args.keep_only_highly_variable)
     run_pca(adata, args.show_pca_plots)
+    print('---Cell cycle scoring')
     cell_cycle_genes = cell_cycle_scoring(adata, args.show_cell_cycle_plots)
     sc.pp.regress_out(adata, ['pct_counts_mt', 'S_score', 'G2M_score'])
     sc.pp.scale(adata, max_value=10)
 
     # plot_cell_cycle_after_regression(adata, cell_cycle_genes)
+    print('---Clustering')
     adata = clustering(adata, args.dataset, args.keep_only_highly_variable)
 
+    print('---Known marker genes')
     marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
     if args.show_marker_genes_plots:
         plot_marker_genes(adata, marker_genes, main_cell_types)
