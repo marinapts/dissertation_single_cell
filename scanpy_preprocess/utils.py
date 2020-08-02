@@ -14,16 +14,23 @@ def get_colormap():
 
 def get_known_marker_genes(adata):
     marker_genes = dict()
-    marker_genes['neural_progen'] = ['Pax6', 'Vim', 'Sox2']
-    marker_genes['intermediate_progen'] = ['Eomes', 'Btg2']
-    marker_genes['post_mitotic'] = ['Tbr1', 'Sox5']
-    marker_genes['ectopic'] = ['Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3']
+    # marker_genes['neural_progen'] = ['Pax6', 'Vim', 'Sox2']
+    # marker_genes['intermediate_progen'] = ['Eomes', 'Btg2']
+    # marker_genes['post_mitotic'] = ['Tbr1', 'Sox5']
+    # marker_genes['ectopic'] = ['Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3']
 
-    main_cell_types = marker_genes['neural_progen'] + marker_genes['intermediate_progen'] + marker_genes['post_mitotic']
+    # main_cell_types = marker_genes['neural_progen'] + marker_genes['intermediate_progen'] + marker_genes['post_mitotic']
+
+    marker_genes['Neural Progenitors'] = ['Pax6', 'Vim', 'Sox2']
+    marker_genes['Intermediate Progenitors'] = ['Eomes', 'Btg2']
+    marker_genes['Post-mitotic Neurons'] = ['Tbr1', 'Sox5']
+    marker_genes['Ectopic'] = ['Gsx2', 'Prdm13', 'Dlx1', 'Dlx2', 'Dlx5', 'Gad1', 'Gad2', 'Ptf1a', 'Msx3', 'Helt', 'Olig3']
+    main_cell_types = marker_genes['Neural Progenitors'] + marker_genes['Intermediate Progenitors'] + marker_genes['Post-mitotic Neurons']
+
     var_names = set(adata.var_names)
     columns = set(adata.obs.columns)
     gene_names = var_names.union(columns)
-    available_ectopic = gene_names.intersection(marker_genes['ectopic'])
+    available_ectopic = gene_names.intersection(marker_genes['Ectopic'])
 
     return marker_genes, main_cell_types, available_ectopic
 

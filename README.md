@@ -21,10 +21,14 @@ TODO list:
 
 ### Preprocessing
 Preprocess datasets that exist under the data directory. New h5ad files (all genes or only highly variable genes)
-are saved in *ann_data*.
+are saved in *ann_data*. Run the bash script OR the python file directly by passing the arguments.
 
-```bash
-python scanpy_preprocess/preprocess.py --dataset E13_hom --keep_only_highly_variable --write_to_file
+```console
+bash scripts/preprocess.sh
+```
+
+```console
+python scanpy_preprocess/preprocess.py --dataset E14_hom E13_hom --keep_only_highly_variable --write_to_file
 ```
 
 Setting the flag `--keep_only_highly_variable` produces the files `ann_data/E1*_hom_variable_genes.h5ad` while
@@ -37,9 +41,22 @@ python scanpy_preprocess/integration.py --dataset_type variable --write_to_file
 ```
 
 ### Differential expression and cell-type annotation on initial data
+The ranked list of the genes found by DE are saved in the files under *cellmarker*.
 
 ```bash
  python scanpy_preprocess/marker_genes.py --dataset E14_hom --dataset_type variable  --update_file
+```
+
+### Create custom list of cell markers from the CellMarker DB
+Creates the *custom_cell_marker_db.csv* cell marker file. To be used SCSA?
+
+```bash
+ python cellmarker/process_cellmarker_db.py
+```
+
+```bash
+cd cellmarker
+python SCSA.py -d whole.db -i DE_E14_hom_variable_genes.csv -s scanpy -E -f1.5 -p 0.05 -o result -m txt -g Mouse -k Brain -M custom_cell_marker_db.csv
 ```
 
 ### Analysis of the AE bottleneck

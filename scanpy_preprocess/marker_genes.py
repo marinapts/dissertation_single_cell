@@ -125,6 +125,12 @@ if __name__ == '__main__':
 
     # DE to calculate marker genes for the clusters
     ranked_genes = differential_expression(adata, clusters_key, top_n_genes, args.plot_diff_expression, DEGs_file)
+
+    # Write marker genes in a csv for annotation by SCSA
+    groups = ranked_genes['names'].dtype.names
+    dat = pd.DataFrame({group + '_' + key[:1]: ranked_genes[key][group] for group in groups for key in ['names', 'logfoldchanges', 'scores', 'pvals']})
+    dat.to_csv('cellmarker/DE_' + data_filename + '.csv')
+
     # Get overlap of known marker genes with the marker genes found from DE
     gene_overlap_norm = marker_gene_overlap(adata, ranked_genes)
     gene_overlap_norm_distr = probability_distr_of_overlap(gene_overlap_norm)
