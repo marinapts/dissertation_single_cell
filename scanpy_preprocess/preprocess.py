@@ -162,7 +162,7 @@ def clustering(adata, dataset, keep_only_highly_variable):
 
 
 def plot_marker_genes(adata, marker_genes, main_cell_types):
-    if DATASET_NAME == 'E13_hom':
+    if DATASET_NAME == 'E13_hom' and ('Vim' in marker_genes['Neural Progenitors']):
         marker_genes['Neural Progenitors'].remove('Vim')
         main_cell_types.remove('Vim')
         print('Vim removed')
@@ -178,7 +178,7 @@ def plot_marker_genes(adata, marker_genes, main_cell_types):
     vmax = 5
 
     print('3 cell types:')
-    sc.pl.umap(adata, color=main_cell_types, cmap=get_colormap(), legend_loc='on data', size=50, ncols=3,
+    sc.pl.umap(adata, color=main_cell_types, cmap=get_colormap('blue'), legend_loc='on data', size=50, ncols=3,
                vmin=vmin, vmax=vmax, use_raw=use_raw, save='_3types_' + DATASET_NAME)
 
     print('Ectopic:')
@@ -186,7 +186,7 @@ def plot_marker_genes(adata, marker_genes, main_cell_types):
                vmin=vmin, vmax=vmax, use_raw=use_raw, save='_ectopic_' + DATASET_NAME)
 
     # Print all in one image
-    sc.pl.umap(adata, color=main_cell_types + list(available_ectopic), cmap=get_colormap(), size=50,
+    sc.pl.umap(adata, color=main_cell_types + list(available_ectopic), cmap=get_colormap('blue'), size=50,
                vmin=vmin, vmax=vmax, use_raw=use_raw, save='_all_' + DATASET_NAME)
 
 
@@ -218,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--write_to_file', action='store_true', help='Write preprocess data to h5ad file')
     args = parser.parse_args()
 
-    sc_data = []
+    alldata = {}
 
     for dataset in args.dataset:
         DATASET_NAME = dataset
@@ -274,4 +274,4 @@ if __name__ == '__main__':
             adata.write(processed_file)
             print('{} file saved'.format(processed_file))
 
-        sc_data.append(adata)
+        alldata[dataset] = adata

@@ -3,9 +3,12 @@ import numpy as np
 from matplotlib import colors
 
 
-def get_colormap():
+def get_colormap(color='red'):
     # Define a nice colour map for gene expression
-    colors2 = plt.cm.Reds(np.linspace(0, 1, 128))
+    if color == 'red':
+        colors2 = plt.cm.Reds(np.linspace(0, 1, 128))
+    elif color == 'blue':
+        colors2 = plt.cm.Blues(np.linspace(0, 1, 128))
     colors3 = plt.cm.Greys_r(np.linspace(0.7, 0.8, 20))
     colorsComb = np.vstack([colors3, colors2])
     mymap = colors.LinearSegmentedColormap.from_list('my_colormap', colorsComb)
