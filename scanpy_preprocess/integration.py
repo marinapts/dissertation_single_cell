@@ -11,6 +11,14 @@ sc.set_figure_params(facecolor="white", figsize=(8, 8))
 sc.settings.verbosity = 3
 np.random.seed(2211)
 
+DATASET_NAME = ''
+FIGDIR = './figures/integration/'
+
+sc.settings.figdir = FIGDIR
+sc.settings.file_format_figs = 'eps'
+sc.settings._vector_friendly = False
+sc.settings.autosave = True
+sc.settings.autoshow = True
 
 def visualise_qc_metrics(E13, E14):
     # Visualise QC metrics
@@ -67,8 +75,11 @@ if __name__ == '__main__':
     sc.pp.neighbors(adata_integr, use_rep='scanorama_embedding', n_neighbors=50)
     sc.tl.leiden(adata_integr, key_added='integr_clusters')
     sc.tl.umap(adata_integr, min_dist=0.5)
-    sc.pl.umap(adata_integr, color='integr_clusters', legend_loc='on data', palette=sc.pl.palettes.default_20)
-    sc.pl.umap(adata_integr, color='batch', palette=sc.pl.palettes.default_20)
+
+    palette = sc.pl.palettes.default_20
+    sc.pl.umap(adata_integr, color='integr_clusters', legend_loc='on data', palette=palette,
+               title='Clusters on datasets integration', save='_clusters')
+    sc.pl.umap(adata_integr, color='batch', palette=palette, save='_batch', title='Integration of datasets')
 
     if args.write_to_file:
         # Write data to file
