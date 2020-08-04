@@ -71,6 +71,13 @@ python SCSA.py -d whole.db -i DE_E14_hom_variable_genes.csv -s scanpy -E -f1.5 -
 ```
 
 ### Analysis of the AE bottleneck
+
+```console
+ bash scripts/bottleneck.sh
+```
+
+or
+
 ```console
 python analyse_bottleneck.py --dataset E14_hom --dataset_type variable --kmeans
 ```

@@ -59,7 +59,7 @@ def differential_expression(adata, clusters_key, n_genes, DEGs_file, updated):
         top_ranked_genes_per_cluster.to_csv(DEGs_file)
 
     sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
-                                    cmap='bwr', show_gene_labels=True, save=fig_title)
+                                    cmap='bwr', show_gene_labels=True, var_group_rotation=45, save=fig_title)
     sc.tl.dendrogram(adata, groupby=clusters_key, use_rep='X_umap', var_names=marker_genes, use_raw=use_raw)
     sc.pl.dendrogram(adata, groupby=clusters_key, save=fig_title)
     sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, save=fig_title)
@@ -104,7 +104,7 @@ def annotate_clusters_based_on_overlap(gene_overlap_norm):
         max_overlap = max(overlaps.values)
 
         if max_overlap == 0:
-            cluster_annotations[cluster] = 'unknown'
+            cluster_annotations[cluster] = 'Unknown'
         else:
             cluster_annotations[cluster] = overlaps.idxmax()
     print('cluster_annotations', cluster_annotations)
@@ -148,8 +148,8 @@ if __name__ == '__main__':
             marker_genes['Neural Progenitors'].remove('Vim')
             main_cell_types.remove('Vim')
 
-        # Show initial clusters and expression of known marker genes - nothing enw
-        # plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic)
+        # Show initial clusters and expression of known marker genes - nothing new
+        plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic)
 
         top_n_genes = 100
         DEGs_filename = dataset + '_' + args.dataset_type + '_' + str(top_n_genes)
