@@ -56,7 +56,8 @@ def differential_expression(adata, clusters_key, n_genes, DEGs_file, updated):
 
     # Write top_n_genes for each cluster in a csv file
     if DEGs_file is not None:
-        top_ranked_genes_per_cluster.to_csv(DEGs_file)
+        top_ranked_genes_per_cluster.to_csv(DEGs_file + '.csv')
+        top_ranked_genes_per_cluster.to_latex(DEGs_file + '_latex.table')
 
     sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
                                     cmap='bwr', show_gene_labels=True, var_group_rotation=45, save=fig_title)
@@ -153,7 +154,7 @@ if __name__ == '__main__':
 
         top_n_genes = 100
         DEGs_filename = dataset + '_' + args.dataset_type + '_' + str(top_n_genes)
-        DEGs_file = Path('DEGs', DEGs_filename + '.csv')
+        DEGs_file = 'DEGs/' + DEGs_filename
 
         # DE to calculate marker genes for the clusters
         ranked_genes = differential_expression(adata, clusters_key, top_n_genes, DEGs_file, updated=False)
