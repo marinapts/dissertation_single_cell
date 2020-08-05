@@ -26,6 +26,7 @@ sc.settings.file_format_figs = 'eps'
 sc.settings._vector_friendly = False
 sc.settings.autosave = True
 sc.settings.autoshow = False
+sc.settings._frameon = False
 
 
 vmin = -5
@@ -150,8 +151,8 @@ def differential_expression(adata, bottleneck_anndata, clusters_key, n_genes, ke
         top_ranked_genes_bottleneck.to_csv(DEGs_file)
 
     # Show DE plots
-    sc.pl.rank_genes_groups_heatmap(adata, groupby='kmeans', n_genes=5, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
-                                    cmap='bwr', show_gene_labels=True, var_group_rotation=45, save=DATASET_NAME)
+    # sc.pl.rank_genes_groups_heatmap(adata, groupby='kmeans', n_genes=5, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
+    #                                 cmap='bwr', show_gene_labels=True, var_group_rotation=45, save=DATASET_NAME)
     sc.tl.dendrogram(bottleneck_anndata, groupby=clusters_key, use_rep='X_umap', var_names=marker_genes, use_raw=use_raw)
     sc.pl.dendrogram(bottleneck_anndata, groupby=clusters_key, save=DATASET_NAME)
     # sc.pl.rank_genes_groups_dotplot(bottleneck_anndata, n_genes=5, save=DATASET_NAME)
@@ -163,6 +164,7 @@ def marker_gene_overlap(bottleneck_anndata, marker_genes, ranked_genes):
     fig, ax = plt.subplots(figsize=(10, 3))
     gene_overlap_norm = sc.tl.marker_gene_overlap(bottleneck_anndata, reference_markers=marker_genes,
                                                   key='rank_genes_bottleneck', normalize='reference')
+    print('Marker gene overlap:')
     print(gene_overlap_norm)
     sb.heatmap(gene_overlap_norm, cbar=True, annot=True)
     plt.tight_layout()
@@ -181,6 +183,7 @@ if __name__ == '__main__':
 
     alldata = {}
     Path(FIGDIR).mkdir(parents=True, exist_ok=True)
+    Path('DEGs/bottleneck/').mkdir(parents=True, exist_ok=True)
 
     for dataset in args.dataset:
         DATASET_NAME = dataset
@@ -200,7 +203,7 @@ if __name__ == '__main__':
         # HDBSCAN
         hdbscan_fit = hdbscan.HDBSCAN(min_samples=10, min_cluster_size=500)
         hdbscan_labels = hdbscan_fit.fit_predict(umap_embedding)
-        plot_clustering(umap_embedding, hdbscan_labels,  cluster_alg='hdbscan', title='HDBSCAN')
+        plot_clustering(umap_embedding, hdbscan_labels, cluster_alg='hdbscan', title='HDBSCAN')
         clustered = (hdbscan_labels >= 0)
         pct_clustered = np.sum(clustered) / bottleneck.shape[0]  # Percentage of cells that were clustered
         print('HDBSCAN percentage clustered:', pct_clustered)
@@ -214,7 +217,7 @@ if __name__ == '__main__':
         if DATASET_NAME == 'E13_hom':  # E13_hom doesn't have marker genes for ectopic cells so we use E14_hom
             E14_adata = sc.read(Path('ann_data', 'E14_hom_' + args.dataset_type + '_genes.h5ad'))
             ectopic = pd.DataFrame(E14_adata.uns['rank_genes_groups']['names'])['Ectopic cells'].head(20)
-            plot_marker_genes(umap_embedding, adata, ectopic,  plot_type='DE_markers', cmap='PuBu', n_cols=4)
+            plot_marker_genes(umap_embedding, adata, ectopic, plot_type='DE_markers', cmap='PuBu', n_cols=4)
 
         # Initialise AnnData object for the bottleneck (might not be needed)
         bn = sc.AnnData(bottleneck)
@@ -235,12 +238,11 @@ if __name__ == '__main__':
         # @TODO: See which clusters express more ectopic genes and use that number instead of 9
         if DATASET_NAME == 'E14_hom':
             bn_DE_genes = pd.DataFrame(bn.uns['rank_genes_bottleneck']['names'])['9'].head(20)
-            plot_marker_genes(umap_embedding, adata, bn_DE_genes,  plot_type='DE_NEW_9', cmap='PuBu', n_cols=4)
+            plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_9', cmap='PuBu', n_cols=4)
 
             bn_DE_genes = pd.DataFrame(bn.uns['rank_genes_bottleneck']['names'])['0'].head(20)
-            plot_marker_genes(umap_embedding, adata, bn_DE_genes,  plot_type='DE_NEW_0', cmap='PuBu', n_cols=4)
+            plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_0', cmap='PuBu', n_cols=4)
 
         # Get overlap of known marker genes with the marker genes found from DE
         gene_overlap_norm = marker_gene_overlap(bn, marker_genes, ranked_de_genes)
         gene_overlap_norm_distr = probability_distr_of_overlap(gene_overlap_norm)
-        print(gene_overlap_norm_distr)

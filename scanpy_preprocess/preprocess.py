@@ -17,11 +17,13 @@ sns.set(style='whitegrid')
 colors = ["#3498db", "#9b59b6", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
 sns.set_palette(sns.color_palette(colors))  # Set your custom color palette
 
-sc.settings.figdir = './figures/preprocess'
+FIG_DIR = './figures/preprocess/'
+sc.settings.figdir = FIG_DIR
 sc.settings.file_format_figs = 'eps'
 sc.settings._vector_friendly = False
 sc.settings.autosave = True
 sc.settings.autoshow = False
+sc.settings._frameon = False
 
 DATASET_NAME = ''
 
@@ -120,7 +122,7 @@ def cell_cycle_scoring(adata):
     # UMAP on 40 PCs
     sc.pp.neighbors(adata_cc_genes, n_neighbors=10, n_pcs=40)
     sc.tl.umap(adata_cc_genes)
-    sc.pl.umap(adata_cc_genes, color='phase', title='UMAP on 40 PCs', save='_ccbefore_' + DATASET_NAME)
+    sc.pl.umap(adata_cc_genes, color='phase', title='Cell cycle phases before regression', save='_ccbefore_' + DATASET_NAME)
 
     return cell_cycle_genes
 
@@ -136,7 +138,7 @@ def plot_cell_cycle_after_regression(adata, cell_cycle_genes):
     # UMAP on 40 PCs
     sc.pp.neighbors(adata_cc_genes_regressed, n_neighbors=10, n_pcs=40)
     sc.tl.umap(adata_cc_genes_regressed)
-    sc.pl.umap(adata_cc_genes_regressed, color='phase', title='UMAP on 40 PCs', save='_ccafter_' + DATASET_NAME)
+    sc.pl.umap(adata_cc_genes_regressed, color='phase', title='Cell cycle phases after regression', save='_ccafter_' + DATASET_NAME)
 
 
 def clustering(adata, dataset, keep_only_highly_variable):
@@ -231,15 +233,19 @@ if __name__ == '__main__':
         # Quality Control
         print('---Quality control')
         adata.var['mt'] = adata.var_names.str.startswith('mt-')  # annotate the group of mitochondrial genes as 'mt'
-        sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)  # compute QC metrics
+        sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, inplace=True)  # compute QC metrics
         print('# genes with 0 counts:', adata[:, adata.var['total_counts'] == 0].shape[1])
 
         sc.pp.filter_cells(adata, min_genes=200)
         sc.pp.filter_genes(adata, min_cells=3)
 
+        sns.jointplot('log1p_total_counts', 'log1p_n_genes_by_counts', data=adata.obs, kind='hex')
+        plt.tight_layout()
+
         # Quality control plots
         # plot_qc_distplot(adata)
         plot_qc_measures(adata)
+        plt.savefig(FIG_DIR + 'jointplot_' + DATASET_NAME)
 
         # Remove cells with certain threshold
         adata = adata[adata.obs.total_counts < 40000, :]

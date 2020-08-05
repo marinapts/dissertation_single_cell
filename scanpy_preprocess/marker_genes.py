@@ -18,8 +18,9 @@ FIGDIR = './figures/marker_genes/'
 sc.settings.figdir = FIGDIR
 sc.settings.file_format_figs = 'eps'
 sc.settings._vector_friendly = False
-sc.settings.autosave = False
+sc.settings.autosave = True
 sc.settings.autoshow = False
+sc.settings._frameon = False
 
 vmin = -5
 vmax = 5
@@ -36,9 +37,9 @@ cell_type_mapping = {
 
 
 def plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic):
-    sc.pl.umap(adata, color=[clusters_key], legend_loc='on data', save=DATASET_NAME)
+    sc.pl.umap(adata, color=[clusters_key], legend_loc='on data', save=DATASET_NAME, title='Leiden clusters')
     if is_integrated_dataset is True:
-        sc.pl.umap(adata, color=['batch'], save='_batch_' + DATASET_NAME)
+        sc.pl.umap(adata, color=['batch'], save='_batch_' + DATASET_NAME, title='Leiden clusters')
 
     # Plot expression of marker genes
     sc.pl.umap(adata, color=main_cell_types + list(available_ectopic), cmap=get_colormap(),
@@ -171,7 +172,7 @@ if __name__ == '__main__':
 
         # Annotate clusters
         adata.obs[clusters_key + '_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm)
-        sc.pl.umap(adata, color=[clusters_key + '_annotations'], save='_annotations_' + DATASET_NAME)
+        sc.pl.umap(adata, color=[clusters_key + '_annotations'], save='_annotations_' + DATASET_NAME, title='Manual annotations')
 
         # DE to find marker genes for the updated clusters (cell types)
         updated_ranked_genes = differential_expression(adata, clusters_key + '_annotations', top_n_genes, None, updated=True)

@@ -47,6 +47,7 @@ def probability_distr_of_overlap(gene_overlap_norm):
     for cl in gene_overlap_norm.columns:
         gene_overlap_norm_distr[cl] = np.nan_to_num(gene_overlap_norm[cl] / sum(gene_overlap_norm[cl]))
 
+    print('Prob. distribution of marker gene overlap:')
     print(gene_overlap_norm_distr)
 
     return gene_overlap_norm_distr

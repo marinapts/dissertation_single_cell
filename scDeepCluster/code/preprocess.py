@@ -83,9 +83,19 @@ def read_dataset(adata, transpose=False, test_split=False, copy=False):
     else:
         adata.obs['DCA_split'] = 'train'
 
+    print(adata.obs)
     adata.obs['DCA_split'] = adata.obs['DCA_split'].astype('category')
     print('### Autoencoder: Successfully preprocessed {} genes and {} cells.'.format(adata.n_vars, adata.n_obs))
 
+    return adata
+
+
+def val_split(adata):
+    train_idx, test_idx = train_test_split(np.arange(adata.n_obs), test_size=0.2, random_state=42)
+    spl = pd.Series(['train'] * adata.n_obs)
+    spl.iloc[test_idx] = 'test'
+    adata.obs['DCA_split'] = spl.values
+    adata.obs['DCA_split'] = adata.obs['DCA_split'].astype('category')
     return adata
 
 
