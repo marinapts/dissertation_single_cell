@@ -6,3 +6,4 @@ python analyse_bottleneck.py \
 --n_neighbors 30 \
 --min_dist 0.5 \
 --top_n_genes 100 \
+--write_to_file

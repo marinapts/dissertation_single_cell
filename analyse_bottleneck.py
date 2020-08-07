@@ -11,7 +11,7 @@ from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score, sil
 from sklearn.cluster import KMeans
 from pathlib import Path
 
-from scanpy_preprocess.utils import get_colormap, get_known_marker_genes, probability_distr_of_overlap
+from scanpy_preprocess.utils import get_known_marker_genes, probability_distr_of_overlap, marker_gene_overlap, annotate_clusters_based_on_overlap, get_updated_marker_genes
 
 sc.logging.print_version_and_date()
 sns.set(style='white', rc={'figure.figsize': (15, 10)})
@@ -28,19 +28,12 @@ sc.settings.autosave = True
 sc.settings.autoshow = False
 sc.settings._frameon = False
 
-
 vmin = -5
 vmax = 5
 use_raw = False
 
-label2num = {
-    'Neural progenitors': 1,
-    'Intermediate progenitors': 2,
-    'Post-mitotic neurons': 3,
-    'Ectopic cells': 4,
-    'Unknown': 5
-}
-num2label = {v: k for k, v in label2num.items()}  # reverse mapping
+
+celltypes = ['Neural Progenitors', 'Intermediate Progenitors', 'Post-mitotic Neurons', 'Ectopic', 'Unknown']
 
 
 def get_all_data(dataset):
@@ -50,8 +43,8 @@ def get_all_data(dataset):
 
 
 def fit_umap(data, n_neighbors=15, min_dist=0.5, metric='euclidean'):
-    np.random.seed(42)
-    umap_fit = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric, random_state=42)
+    np.random.seed(MYSEED)
+    umap_fit = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric, random_state=MYSEED)
     embedding = umap_fit.fit_transform(data)
     return embedding
 
@@ -73,10 +66,28 @@ def plot_clustering(embedding, labels, cmap='tab10', cluster_alg='kmeans', title
     fig.savefig(FIGDIR + fig_name + '.eps')
 
 
+def draw_umap(data, labels, embedding=None, n_neighbors=5, min_dist=0.99, metric='euclidean',
+              title='', cmap='tab10', legend_title='Cell type'):
+
+    np.random.seed(MYSEED)
+    if embedding is not None:
+        u = embedding
+    else:
+        u = fit_umap(data, n_neighbors, min_dist)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    scatter = ax.scatter(u[:, 0], u[:, 1], c=labels or None, cmap=cmap, marker='.')
+
+    legend1 = ax.legend(*scatter.legend_elements(), title=legend_title)
+    ax.add_artist(legend1)
+    plt.title(title, fontsize=18)
+    plt.show()
+
+
 def plot_marker_genes(embedding, adata, labels, n_cols=3, title='', plot_type='', cmap='tab10'):
     fig = plt.figure()
     len_labels = len(labels)
-    fig_size = (15, 70)
     n_rows = (len_labels // n_cols) + 1
 
     # Create subplots
@@ -94,44 +105,6 @@ def plot_marker_genes(embedding, adata, labels, n_cols=3, title='', plot_type=''
     fig.set_rasterized(True)
     fig.savefig(FIGDIR + fig_name + '.eps')
     # plt.show()
-
-
-# def plot_marker_genes(embedding, adata, labels, n_cols=3, title='', plot_type='', cmap='tab10'):
-#     fig = plt.figure()
-#     marker_genes = labels.copy()
-#     # Remove any genes that dont exist in the dataset
-#     for g in marker_genes:
-#         if g not in adata.var_names:
-#             marker_genes.remove(g)
-
-#     n_rows = (len(marker_genes) // n_cols) + 1
-
-#     # Filter adata to include only the labels
-#     adata_filtered = adata[:, marker_genes]
-#     # Construct new dataframe from the embeddings and the expression values for the given labels
-#     adata_df = pd.DataFrame(adata_filtered.X, columns=adata_filtered.var_names)
-#     embedding_df = pd.DataFrame(embedding, columns=['x', 'y'])
-#     df = pd.concat([embedding_df, adata_df], axis=1)
-#     print(df['x'])
-#     # df = sc.AnnData(df)
-
-#     # sns.scatterplot(x=df['x'], y=df['y'], hue=df['Pax6'])
-
-#     subplot_idx = 1
-#     for gene in marker_genes:
-#         ax = fig.add_subplot(n_rows, n_cols, subplot_idx)
-#         ax.scatter(df['x'], df['y'], c=df.loc[:, gene], cmap=cmap, marker='.')
-#         ax.set_title(gene)
-#         plt.xticks(color='w')
-#         plt.yticks(color='w')
-#         subplot_idx = subplot_idx + 1
-
-#     # sns.relplot(data=df, x='x', y='y', col='Pax6', col_wrap=4, kind='scatter')
-
-#     # fig_name = '_'.join(['marker_genes', plot_type, DATASET_NAME])
-#     # fig.set_rasterized(True)
-#     # fig.savefig(FIGDIR + fig_name + '.eps')
-#     plt.show()
 
 
 def differential_expression(adata, bottleneck_anndata, clusters_key, n_genes, key_added, DEGs_file=None):
@@ -160,18 +133,6 @@ def differential_expression(adata, bottleneck_anndata, clusters_key, n_genes, ke
     return adata.uns[key_added]
 
 
-def marker_gene_overlap(bottleneck_anndata, marker_genes, ranked_genes):
-    fig, ax = plt.subplots(figsize=(10, 3))
-    gene_overlap_norm = sc.tl.marker_gene_overlap(bottleneck_anndata, reference_markers=marker_genes,
-                                                  key='rank_genes_bottleneck', normalize='reference')
-    print('Marker gene overlap:')
-    print(gene_overlap_norm)
-    sb.heatmap(gene_overlap_norm, cbar=True, annot=True)
-    plt.tight_layout()
-    # plt.show()
-    return gene_overlap_norm
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Preprocessing of single-cell RNA-seq datasets')
     parser.add_argument('--dataset', nargs='+', help='One or more space separated datasets, e.g. E14_hom E13_hom integration')
@@ -179,11 +140,13 @@ if __name__ == '__main__':
     parser.add_argument('--n_neighbors', type=int, default=30)
     parser.add_argument('--min_dist', type=float, default=0.5)
     parser.add_argument('--top_n_genes', type=int, default=100)
+    parser.add_argument('--write_to_file', action='store_true', help='Write bottleneck AnnData to h5ad file')
     args = parser.parse_args()
 
     alldata = {}
     Path(FIGDIR).mkdir(parents=True, exist_ok=True)
     Path('DEGs/bottleneck/').mkdir(parents=True, exist_ok=True)
+    Path('ann_data/bottleneck/').mkdir(parents=True, exist_ok=True)
 
     for dataset in args.dataset:
         DATASET_NAME = dataset
@@ -191,58 +154,95 @@ if __name__ == '__main__':
         # One of: E1*_hom_variable, E1*_hom_all, integration_variable, integration_all (where * is 3 or 4)
         dataset_with_type = dataset + '_' + args.dataset_type
         adata, bottleneck = get_all_data(dataset_with_type)
-        n_neighbors = 15
 
         umap_embedding = fit_umap(bottleneck, n_neighbors=args.n_neighbors, min_dist=args.min_dist)
 
         # K-Means
         kmeans = KMeans(n_clusters=10, n_init=20, random_state=MYSEED).fit(umap_embedding)
-        plot_clustering(umap_embedding, kmeans.labels_, cluster_alg='kmeans', title='K-Means')
+        # plot_clustering(umap_embedding, kmeans.labels_, cluster_alg='kmeans', title='K-Means')
         print('K-Means silhouette_score:', silhouette_score(umap_embedding, kmeans.labels_, metric='euclidean'))
 
         # HDBSCAN
         hdbscan_fit = hdbscan.HDBSCAN(min_samples=10, min_cluster_size=500)
         hdbscan_labels = hdbscan_fit.fit_predict(umap_embedding)
-        plot_clustering(umap_embedding, hdbscan_labels, cluster_alg='hdbscan', title='HDBSCAN')
+        # plot_clustering(umap_embedding, hdbscan_labels, cluster_alg='hdbscan', title='HDBSCAN')
         clustered = (hdbscan_labels >= 0)
         pct_clustered = np.sum(clustered) / bottleneck.shape[0]  # Percentage of cells that were clustered
         print('HDBSCAN percentage clustered:', pct_clustered)
 
         # Plot expression of known marker genes
-        marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
-        plot_marker_genes(umap_embedding, adata, main_cell_types, plot_type='main_cell_types', cmap='PuBu')
-        plot_marker_genes(umap_embedding, adata, marker_genes['Ectopic'], plot_type='ectopic', cmap='PuRd')
+        # marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
+        marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
+
+        # plot_marker_genes(umap_embedding, adata, main_cell_types, plot_type='main_cell_types', cmap='PuBu')
+        # plot_marker_genes(umap_embedding, adata, marker_genes['Ectopic'], plot_type='ectopic', cmap='PuRd')
 
         # Plot the expression of the top 20 marker genes found by DE on the initial dataset
-        if DATASET_NAME == 'E13_hom':  # E13_hom doesn't have marker genes for ectopic cells so we use E14_hom
-            E14_adata = sc.read(Path('ann_data', 'E14_hom_' + args.dataset_type + '_genes.h5ad'))
-            ectopic = pd.DataFrame(E14_adata.uns['rank_genes_groups']['names'])['Ectopic cells'].head(20)
-            plot_marker_genes(umap_embedding, adata, ectopic, plot_type='DE_markers', cmap='PuBu', n_cols=4)
+        # if DATASET_NAME == 'E13_hom':  # E13_hom doesn't have marker genes for ectopic cells so we use E14_hom
+        #     E14_adata = sc.read(Path('ann_data', 'E14_hom_' + args.dataset_type + '_genes.h5ad'))
+        #     ectopic = pd.DataFrame(E14_adata.uns['rank_genes_groups']['names'])['Ectopic cells'].head(20)
+        #     plot_marker_genes(umap_embedding, adata, ectopic, plot_type='DE_markers', cmap='PuBu', n_cols=4)
+
+        #
+        # =====================================================================
+        #               ANALYSIS OF BOTTLENECK STARTS HERE
+        # =====================================================================
+        #
 
         # Initialise AnnData object for the bottleneck (might not be needed)
         bn = sc.AnnData(bottleneck)
         # bn.obs_names = adata.obs_names
         adata.obs['kmeans'] = pd.Categorical(kmeans.labels_)
+        adata.obs['hdbscan'] = pd.Categorical(hdbscan_labels)
         bn.obs = adata.obs
         bn.uns = adata.uns
-        print(adata)
+        bn.obsm['X_umap'] = umap_embedding
+
+        print('adata', adata)
+        print('bn', bn)
 
         # DE on the bottleneck using the kmeans clusters
         DEGs_file = Path('DEGs/bottleneck', dataset_with_type + '_' + str(args.top_n_genes) + '.csv')
         rank_key = 'rank_genes_bottleneck'
+
         ranked_de_genes = differential_expression(adata, bn, 'kmeans', args.top_n_genes, key_added=rank_key, DEGs_file=DEGs_file)
-        bn.uns['rank_genes_bottleneck'] = adata.uns['rank_genes_bottleneck']
+        bn.uns[rank_key] = adata.uns[rank_key]
 
         # Plot the expression of the top 20 marker genes found by DE on the bottleneck!
         # Select clusters that we believe there are ectopic
         # @TODO: See which clusters express more ectopic genes and use that number instead of 9
-        if DATASET_NAME == 'E14_hom':
-            bn_DE_genes = pd.DataFrame(bn.uns['rank_genes_bottleneck']['names'])['9'].head(20)
-            plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_9', cmap='PuBu', n_cols=4)
+        # if DATASET_NAME == 'E14_hom':
+        #     bn_DE_genes = pd.DataFrame(bn.uns[rank_key]['names'])['9'].head(20)
+        #     plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_9', cmap='PuBu', n_cols=4)
 
-            bn_DE_genes = pd.DataFrame(bn.uns['rank_genes_bottleneck']['names'])['0'].head(20)
-            plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_0', cmap='PuBu', n_cols=4)
+        #     bn_DE_genes = pd.DataFrame(bn.uns[rank_key]['names'])['0'].head(20)
+        #     plot_marker_genes(umap_embedding, adata, bn_DE_genes, plot_type='DE_NEW_0', cmap='PuBu', n_cols=4)
 
         # Get overlap of known marker genes with the marker genes found from DE
-        gene_overlap_norm = marker_gene_overlap(bn, marker_genes, ranked_de_genes)
+        gene_overlap_norm = marker_gene_overlap(bn, marker_genes, FIGDIR, DATASET_NAME, key_added=rank_key)
         gene_overlap_norm_distr = probability_distr_of_overlap(gene_overlap_norm)
+
+        #
+        # ==========================================================================
+        #       ANNOTATION - might bot be needed the annotation in the bottleneck
+        # ==========================================================================
+        bn.obs['bottleneck_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm, bn, clusters_key='kmeans')
+        sc.pl.umap(bn, color='kmeans', title='Initial Clustering', save=DATASET_NAME + '_kmeans', legend_loc='on data')
+        sc.pl.umap(bn, color=['leiden_annotations', 'bottleneck_annotations'],
+                   title=['E14_hom annotations', 'Bottleneck annotations'], save=DATASET_NAME + '_both_annotations')
+
+        # Print frequencies of cell types for each annotation
+        print('Leiden annotations')
+        for ct in celltypes:
+            print(ct, len(bn[bn.obs['leiden_annotations'] == ct]))
+
+        print('Bottleneck annotations')
+        for ct in celltypes:
+            print(ct, len(bn[bn.obs['bottleneck_annotations'] == ct]))
+
+        if args.write_to_file:
+            # Write in h5ad file to use as an input to scDeepCluster
+            filename = '_'.join(['bottleneck', dataset, args.dataset_type]) + '.h5ad'
+            bottleneck_file_path = Path('ann_data', 'bottleneck', filename)
+            bn.write(bottleneck_file_path)
+            print('{} file saved'.format(bottleneck_file_path))

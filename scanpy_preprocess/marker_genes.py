@@ -1,11 +1,9 @@
 import scanpy as sc
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import argparse
 from pathlib import Path
-from utils import get_colormap, get_known_marker_genes, probability_distr_of_overlap
+from utils import get_colormap, get_known_marker_genes, probability_distr_of_overlap, marker_gene_overlap, annotate_clusters_based_on_overlap
 
 sc.logging.print_versions()
 sc.set_figure_params(facecolor="white", figsize=(8, 4))
@@ -27,15 +25,6 @@ vmax = 5
 use_raw = False
 
 
-cell_type_mapping = {
-    'neural_progen': 'Neural progenitors',
-    'intermediate_progen': 'Intermediate progenitors',
-    'post_mitotic': 'Post-mitotic neurons',
-    'ectopic': 'Ectopic cells',
-    'unknown': 'Unknown'
-}
-
-
 def plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic):
     sc.pl.umap(adata, color=[clusters_key], legend_loc='on data', save=DATASET_NAME, title='Leiden clusters')
     if is_integrated_dataset is True:
@@ -46,13 +35,23 @@ def plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, a
                vmin=-5, vmax=5, use_raw=False, save='_markergenes_expr_' + DATASET_NAME)
 
 
-def differential_expression(adata, clusters_key, n_genes, DEGs_file, updated):
+def differential_expression(adata, clusters_key, top_n_genes, DEGs_file, key_added='rank_genes_groups', updated=False):
+    """Finds top_n differentially expressed genes in each cluster and ranks them using Wilcoxon rank-sum.
+    Then writes the DE genes into a csv and updates the adata with adata.uns[key_added]. (+ some plots)
+    Args:
+        adata (AnnData)
+        clusters_key (str): The key of adata.obs that contains the cluster numbers (or annotations)
+        top_n_genes (int): Num of genes to appear in table
+        DEGs_file (TYPE): Name of the csv (or latex) file with the DEGs for each cluster - to be saved under /DEGs
+        fig_name (TYPE): Name for the figure to be saved
+    """
     fig_title = '_updated_' + DATASET_NAME if updated else DATASET_NAME
     # Calculate marker genes
-    sc.tl.rank_genes_groups(adata, clusters_key, n_genes=n_genes, method='wilcoxon', use_raw=True)  # 100 genes by default
-    sc.pl.rank_genes_groups(adata, n_genes=20, sharey=False, use_raw=True, save=fig_title)
+    sc.tl.rank_genes_groups(adata, clusters_key, n_genes=top_n_genes, key_added=key_added, method='wilcoxon', use_raw=True)  # 100 genes by default
+    sc.pl.rank_genes_groups(adata, n_genes=20, key=key_added, sharey=False, use_raw=True, save=fig_title)
 
-    top_ranked_genes_per_cluster = pd.DataFrame(adata.uns['rank_genes_groups']['names'])
+    print('Top ranked genes for key ', key_added)
+    top_ranked_genes_per_cluster = pd.DataFrame(adata.uns[key_added]['names'])
     print(top_ranked_genes_per_cluster.head(20))
 
     # Write top_n_genes for each cluster in a csv file
@@ -61,66 +60,14 @@ def differential_expression(adata, clusters_key, n_genes, DEGs_file, updated):
         top_ranked_genes_per_cluster.to_latex(DEGs_file + '.latex')
         (top_ranked_genes_per_cluster.transpose()).head(10).to_latex(DEGs_file + '.latex.T')
 
-    sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
+    # Some plots
+    sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, key=key_added, use_raw=use_raw, swap_axes=True, vmin=vmin, vmax=vmax,
                                     cmap='bwr', show_gene_labels=True, var_group_rotation=45, save=fig_title)
     sc.tl.dendrogram(adata, groupby=clusters_key, use_rep='X_umap', var_names=marker_genes, use_raw=use_raw)
     sc.pl.dendrogram(adata, groupby=clusters_key, save=fig_title)
-    sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, save=fig_title)
+    sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, key=key_added, save=fig_title)
 
-    return adata.uns['rank_genes_groups']
-
-
-def marker_gene_overlap(adata, ranked_genes, updated):
-    gene_overlap_norm = sc.tl.marker_gene_overlap(adata, reference_markers=marker_genes,
-                                                  key='rank_genes_groups', normalize='reference')
-    print(gene_overlap_norm)
-
-    if updated == True:
-        fig_title = 'gene_overlap_heatmap_updated'
-        rotation = 25
-        size = (14, 9)
-    else:
-        fig_title = 'gene_overlap_heatmap_'
-        rotation = 0
-        size = (14, 6)
-
-    plt.figure(figsize=size)
-    # ax0 = plt.subplot(111)
-    # ax1 = sns.heatmap(gene_overlap_norm, cbar=True, annot=True, square=True)
-    ax1 = sns.heatmap(gene_overlap_norm, cbar=True, annot=True, square=False)
-
-    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=rotation)
-    ax1.set_title('Marker gene overlap heatmap')
-    fig = ax1.get_figure()
-    # fig.set_size_inches(12, 8)
-    fig.savefig(FIGDIR + fig_title + DATASET_NAME + '.eps')
-
-    return gene_overlap_norm
-
-
-def annotate_clusters_based_on_overlap(gene_overlap_norm):
-    cluster_annotations = dict()
-
-    # Specify a cell type for each cluster
-    for cluster in gene_overlap_norm.columns:
-        overlaps = gene_overlap_norm.loc[:, cluster]
-        max_overlap = max(overlaps.values)
-
-        if max_overlap == 0:
-            cluster_annotations[cluster] = 'Unknown'
-        else:
-            cluster_annotations[cluster] = overlaps.idxmax()
-    print('cluster_annotations', cluster_annotations)
-
-    # Map each cluster to its cell type
-    new_cluster_names = list()
-    for leiden in adata.obs[clusters_key]:
-        # cell_type_name = cell_type_mapping[cluster_annotations[leiden]]
-        cell_type_name = cluster_annotations[leiden]
-#         print(cell_type_name)
-        new_cluster_names.append(cell_type_name)
-
-    return new_cluster_names
+    return adata.uns[key_added]
 
 
 if __name__ == '__main__':
@@ -154,12 +101,18 @@ if __name__ == '__main__':
         # Show initial clusters and expression of known marker genes - nothing new
         plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic)
 
+        #
+        # =====================================================================
+        #            DIFFERENTIAL EXPRESSION ANALYSIS STARTS HERE
+        # =====================================================================
+        #
+
         top_n_genes = 100
         DEGs_filename = dataset + '_' + args.dataset_type + '_' + str(top_n_genes)
         DEGs_file = 'DEGs/' + DEGs_filename
 
         # DE to calculate marker genes for the clusters
-        ranked_genes = differential_expression(adata, clusters_key, top_n_genes, DEGs_file, updated=False)
+        ranked_genes = differential_expression(adata, clusters_key, top_n_genes, DEGs_file)
 
         # Write marker genes in a csv for annotation by SCSA
         groups = ranked_genes['names'].dtype.names
@@ -167,16 +120,20 @@ if __name__ == '__main__':
         dat.to_csv('cellmarker/DE_' + data_filename + '.csv')
 
         # Get overlap of known marker genes with the marker genes found from DE
-        gene_overlap_norm = marker_gene_overlap(adata, ranked_genes, updated=False)
+        gene_overlap_norm = marker_gene_overlap(adata, marker_genes, FIGDIR, DATASET_NAME)
         gene_overlap_norm_distr = probability_distr_of_overlap(gene_overlap_norm)
 
         # Annotate clusters
-        adata.obs[clusters_key + '_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm)
+        adata.obs[clusters_key + '_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm, adata, clusters_key=clusters_key)
         sc.pl.umap(adata, color=[clusters_key + '_annotations'], save='_annotations_' + DATASET_NAME, title='Manual annotations')
 
         # DE to find marker genes for the updated clusters (cell types)
-        updated_ranked_genes = differential_expression(adata, clusters_key + '_annotations', top_n_genes, None, updated=True)
-        updated_gene_overlap_norm = marker_gene_overlap(adata, updated_ranked_genes, updated=True)
+        annotations_key = 'rank_genes_annotations'
+        updated_ranked_genes = differential_expression(adata, clusters_key + '_annotations', top_n_genes, None,
+                                                       key_added=annotations_key, updated=True)
+
+        updated_gene_overlap_norm = marker_gene_overlap(adata, marker_genes, FIGDIR, DATASET_NAME, key_added=annotations_key, updated=True)
+        updated_gene_overlap_norm_distr = probability_distr_of_overlap(updated_gene_overlap_norm)
 
         if args.update_file:
             adata.write(filepath)
