@@ -49,42 +49,6 @@ def fit_umap(data, n_neighbors=15, min_dist=0.5, metric='euclidean'):
     return embedding
 
 
-def plot_clustering(embedding, labels, cmap='tab10', cluster_alg='kmeans', title='Bottleneck clusters'):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    scatter = ax.scatter(embedding[:, 0], embedding[:, 1], c=labels, cmap=cmap, marker='.')
-
-    legend1 = ax.legend(*scatter.legend_elements(), title='Clusters')
-    ax.add_artist(legend1)
-    plt.xticks(color='w')
-    plt.yticks(color='w')
-    plt.title(title, fontsize=18)
-    plt.tight_layout()
-    # plt.show()
-    fig_name = '_'.join([cluster_alg, DATASET_NAME])
-    ax.set_rasterized(True)
-    fig.savefig(FIGDIR + fig_name + '.eps')
-
-
-def draw_umap(data, labels, embedding=None, n_neighbors=5, min_dist=0.99, metric='euclidean',
-              title='', cmap='tab10', legend_title='Cell type'):
-
-    np.random.seed(MYSEED)
-    if embedding is not None:
-        u = embedding
-    else:
-        u = fit_umap(data, n_neighbors, min_dist)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    scatter = ax.scatter(u[:, 0], u[:, 1], c=labels or None, cmap=cmap, marker='.')
-
-    legend1 = ax.legend(*scatter.legend_elements(), title=legend_title)
-    ax.add_artist(legend1)
-    plt.title(title, fontsize=18)
-    plt.show()
-
-
 def plot_marker_genes(embedding, adata, labels, n_cols=3, title='', plot_type='', cmap='tab10'):
     fig = plt.figure()
     len_labels = len(labels)
@@ -140,10 +104,13 @@ if __name__ == '__main__':
     parser.add_argument('--n_neighbors', type=int, default=30)
     parser.add_argument('--min_dist', type=float, default=0.5)
     parser.add_argument('--top_n_genes', type=int, default=100)
+    parser.add_argument('--n_clusters', type=int, default=10, help='n_clusters for K-Means')
+    parser.add_argument('--fig_dir', type=str, default='./figures/bottleneck/')
     parser.add_argument('--write_to_file', action='store_true', help='Write bottleneck AnnData to h5ad file')
     args = parser.parse_args()
 
     alldata = {}
+    FIGDIR = args.fig_dir
     Path(FIGDIR).mkdir(parents=True, exist_ok=True)
     Path('DEGs/bottleneck/').mkdir(parents=True, exist_ok=True)
     Path('ann_data/bottleneck/').mkdir(parents=True, exist_ok=True)
@@ -158,21 +125,19 @@ if __name__ == '__main__':
         umap_embedding = fit_umap(bottleneck, n_neighbors=args.n_neighbors, min_dist=args.min_dist)
 
         # K-Means
-        kmeans = KMeans(n_clusters=10, n_init=20, random_state=MYSEED).fit(umap_embedding)
-        # plot_clustering(umap_embedding, kmeans.labels_, cluster_alg='kmeans', title='K-Means')
+        kmeans = KMeans(n_clusters=args.n_clusters, n_init=20, random_state=MYSEED).fit(umap_embedding)
         print('K-Means silhouette_score:', silhouette_score(umap_embedding, kmeans.labels_, metric='euclidean'))
 
-        # HDBSCAN
+        # HDBSCAN - not used anywhere
         hdbscan_fit = hdbscan.HDBSCAN(min_samples=10, min_cluster_size=500)
         hdbscan_labels = hdbscan_fit.fit_predict(umap_embedding)
-        # plot_clustering(umap_embedding, hdbscan_labels, cluster_alg='hdbscan', title='HDBSCAN')
         clustered = (hdbscan_labels >= 0)
         pct_clustered = np.sum(clustered) / bottleneck.shape[0]  # Percentage of cells that were clustered
         print('HDBSCAN percentage clustered:', pct_clustered)
 
         # Plot expression of known marker genes
-        # marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
-        marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
+        marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
+        # marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
 
         # plot_marker_genes(umap_embedding, adata, main_cell_types, plot_type='main_cell_types', cmap='PuBu')
         # plot_marker_genes(umap_embedding, adata, marker_genes['Ectopic'], plot_type='ectopic', cmap='PuRd')
