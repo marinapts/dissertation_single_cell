@@ -6,7 +6,6 @@ import umap
 import scanpy as sc
 import argparse
 import hdbscan
-import seaborn as sb
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score, silhouette_score
 from sklearn.cluster import KMeans
 from pathlib import Path
@@ -111,6 +110,8 @@ if __name__ == '__main__':
 
     alldata = {}
     FIGDIR = args.fig_dir
+    sc.settings.figdir = FIGDIR
+
     Path(FIGDIR).mkdir(parents=True, exist_ok=True)
     Path('DEGs/bottleneck/').mkdir(parents=True, exist_ok=True)
     Path('ann_data/bottleneck/').mkdir(parents=True, exist_ok=True)
@@ -135,19 +136,6 @@ if __name__ == '__main__':
         pct_clustered = np.sum(clustered) / bottleneck.shape[0]  # Percentage of cells that were clustered
         print('HDBSCAN percentage clustered:', pct_clustered)
 
-        # Plot expression of known marker genes
-        marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
-        # marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
-
-        # plot_marker_genes(umap_embedding, adata, main_cell_types, plot_type='main_cell_types', cmap='PuBu')
-        # plot_marker_genes(umap_embedding, adata, marker_genes['Ectopic'], plot_type='ectopic', cmap='PuRd')
-
-        # Plot the expression of the top 20 marker genes found by DE on the initial dataset
-        # if DATASET_NAME == 'E13_hom':  # E13_hom doesn't have marker genes for ectopic cells so we use E14_hom
-        #     E14_adata = sc.read(Path('ann_data', 'E14_hom_' + args.dataset_type + '_genes.h5ad'))
-        #     ectopic = pd.DataFrame(E14_adata.uns['rank_genes_groups']['names'])['Ectopic cells'].head(20)
-        #     plot_marker_genes(umap_embedding, adata, ectopic, plot_type='DE_markers', cmap='PuBu', n_cols=4)
-
         #
         # =====================================================================
         #               ANALYSIS OF BOTTLENECK STARTS HERE
@@ -166,6 +154,22 @@ if __name__ == '__main__':
         print('adata', adata)
         print('bn', bn)
 
+        marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
+        # marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
+
+        #
+        # ====================================
+        #       MARKER GENE PLOTTING
+        # ====================================
+        plot_marker_genes(umap_embedding, adata, main_cell_types, plot_type='main_cell_types', cmap='PuBu')
+        plot_marker_genes(umap_embedding, adata, marker_genes['Ectopic'], plot_type='ectopic', cmap='PuRd')
+
+        # Plot the expression of the top 20 marker genes found by DE on the initial dataset
+        if DATASET_NAME == 'E13_hom':  # E13_hom doesn't have marker genes for ectopic cells so we use E14_hom
+            E14_adata = sc.read(Path('ann_data', 'E14_hom_' + args.dataset_type + '_genes.h5ad'))
+            ectopic = pd.DataFrame(E14_adata.uns['rank_genes_groups']['names'])['Ectopic cells'].head(20)
+            plot_marker_genes(umap_embedding, adata, ectopic, plot_type='DE_markers', cmap='PuBu', n_cols=4)
+
         # DE on the bottleneck using the kmeans clusters
         DEGs_file = Path('DEGs/bottleneck', dataset_with_type + '_' + str(args.top_n_genes) + '.csv')
         rank_key = 'rank_genes_bottleneck'
@@ -174,7 +178,7 @@ if __name__ == '__main__':
         bn.uns[rank_key] = adata.uns[rank_key]
 
         # Plot the expression of the top 20 marker genes found by DE on the bottleneck!
-        # Select clusters that we believe there are ectopic
+        # Select clusters that we believe are ectopic
         # @TODO: See which clusters express more ectopic genes and use that number instead of 9
         # if DATASET_NAME == 'E14_hom':
         #     bn_DE_genes = pd.DataFrame(bn.uns[rank_key]['names'])['9'].head(20)

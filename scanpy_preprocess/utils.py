@@ -3,6 +3,7 @@ import numpy as np
 import scanpy as sc
 import seaborn as sns
 from matplotlib import colors
+from pathlib import Path
 
 
 def get_colormap(color='red'):
@@ -105,7 +106,7 @@ def marker_gene_overlap(adata, marker_genes, fig_dir, dataset_name, key_added='r
     ax1.set_title('Marker gene overlap heatmap')
     fig = ax1.get_figure()
     # fig.set_size_inches(12, 8)
-    fig.savefig(fig_dir + fig_title + dataset_name + '.eps')
+    fig.savefig(Path(fig_dir, fig_title + dataset_name + '.eps'))
 
     return gene_overlap_norm
 
@@ -138,4 +139,3 @@ def annotate_clusters_based_on_overlap(gene_overlap_norm, adata, clusters_key='l
         new_cluster_names.append(cell_type_name)
 
     return new_cluster_names
-

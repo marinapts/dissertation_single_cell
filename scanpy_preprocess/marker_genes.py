@@ -83,10 +83,7 @@ if __name__ == '__main__':
         DATASET_NAME = dataset
 
         is_integrated_dataset = True if dataset == 'integration' else False
-        if is_integrated_dataset:
-            data_filename = dataset + '_HOMs_' + args.dataset_type
-        else:
-            data_filename = dataset + '_' + args.dataset_type + '_genes'
+        data_filename = dataset + '_' + args.dataset_type + '_genes'
 
         filepath = Path('ann_data/', data_filename + '.h5ad')
         adata = sc.read(filepath)
@@ -94,7 +91,7 @@ if __name__ == '__main__':
         clusters_key = 'integr_clusters' if is_integrated_dataset else 'leiden'
 
         marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
-        if dataset == 'E13_hom' and args.dataset_type == 'variable':
+        if (dataset == 'E13_hom' and args.dataset_type == 'variable') or (dataset == 'integration'):
             marker_genes['Neural Progenitors'].remove('Vim')
             main_cell_types.remove('Vim')
 

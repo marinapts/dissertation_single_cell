@@ -18,7 +18,9 @@ sc.settings.figdir = FIGDIR
 sc.settings.file_format_figs = 'eps'
 sc.settings._vector_friendly = False
 sc.settings.autosave = True
-sc.settings.autoshow = True
+sc.settings.autoshow = False
+sc.settings._frameon = False
+
 
 def visualise_qc_metrics(E13, E14):
     # Visualise QC metrics
@@ -83,7 +85,7 @@ if __name__ == '__main__':
 
     if args.write_to_file:
         # Write data to file
-        integration_file = 'integration_HOMs_' + args.dataset_type + '.h5ad'
+        integration_file = 'integration_' + args.dataset_type + '_genes.h5ad'
         integration_file_path = Path('ann_data', integration_file)
         adata_integr.write(integration_file_path)
         print('{} integration file saved'.format(integration_file_path))
