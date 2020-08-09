@@ -25,7 +25,7 @@ from loss import poisson_loss, NB, ZINB
 from preprocess import read_dataset, normalize
 import tensorflow as tf
 import pandas as pd
-
+from pathlib import Path
 from numpy.random import seed
 
 seed(2211)
@@ -363,6 +363,8 @@ if __name__ == "__main__":
     parser.add_argument('--ae_weight_file', default='ae_weights.h5')
 
     args = parser.parse_args()
+
+    Path(args.save_dir).mkdir(parents=True, exist_ok=True)
 
     # load dataset
     optimizer1 = Adam(amsgrad=True)
