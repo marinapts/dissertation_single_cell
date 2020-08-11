@@ -1,14 +1,23 @@
 import numpy as np
 import scanpy as sc
 import pickle
-import umap
 import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.tree import DecisionTreeClassifier
+
 
 MYSEED = 2211
 np.random.seed(MYSEED)
 np.random.RandomState(MYSEED)
+
+
+sc.settings.figdir = './figures/classifier/'
+sc.settings.file_format_figs = 'eps'
+sc.settings._vector_friendly = False
+sc.settings.autosave = True
+sc.settings.autoshow = True
+sc.settings._frameon = False
 
 
 def load_HOM_datasets(dataset_type='variable'):
@@ -67,3 +76,9 @@ if __name__ == '__main__':
     E13_var = sc.read('ann_data/E13_hom_variable_genes.h5ad')
     E13_var.obs['predictions'] = y_pred
     sc.pl.umap(E13_var, color=['leiden_annotations', 'predictions'], title=['Leiden annotations', 'RandomForest predictions'])
+
+    #
+    # Eval with DecisionTrees
+    decision_tree_clf = DecisionTreeClassifier(max_depth=6, random_state=MYSEED).fit(X, y)
+    y_pred = decision_tree_clf.predict(X_test)
+    celltypes_percentage(y_pred)

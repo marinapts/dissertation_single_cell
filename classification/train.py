@@ -126,11 +126,15 @@ if __name__ == '__main__':
             'clf': (RandomForestClassifier(n_estimators=200, random_state=MYSEED),),
         }, {
             'clf': (DecisionTreeClassifier(max_depth=6, random_state=MYSEED),),
+            'clf__criterion': ('gini', 'entropy'),
+            'clf__max_depth': (None, 4, 6, 8, 12),
+            'clf__min_samples_leaf': (1, 5, 10, 15, 20),
+            'clf__class_weight': (None, 'balanced')
         }, {
             'clf': (LogisticRegression(max_iter=200, C=1, random_state=MYSEED),),
         },
     ]
-    grid = GridSearchCV(pipeline, param_grid=param_grid, n_jobs=-1, verbose=3, cv=3)
+    grid = GridSearchCV(pipeline, param_grid=param_grid, n_jobs=-20, verbose=3, cv=3)
     grid.fit(X, y_encoded)
     print('The best model is ', grid.best_estimator_)
     print("The best parameters are %s with a score of %0.2f" % (grid.best_params_, grid.best_score_))
