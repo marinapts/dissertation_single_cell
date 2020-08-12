@@ -200,6 +200,7 @@ if __name__ == "__main__":
     parser.add_argument('--update_interval', default=0, type=int)
     parser.add_argument('--scDeepCluster_weights', default='ae_weights.h5')
     parser.add_argument('--latent_output', default='latent_output.csv')
+    parser.add_argument('--bottleneck_size', default=32)
 
     args = parser.parse_args()
 
@@ -233,7 +234,7 @@ if __name__ == "__main__":
     print(args)
 
     # Define scDeepCluster model
-    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 32], n_clusters=args.n_clusters, noise_sd=2.5)
+    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 128, 64, 32, 16, 8, int(args.bottleneck_size)], n_clusters=args.n_clusters, noise_sd=2.5)
     print("autocoder summary")
     scDeepCluster.autoencoder.summary()
     print("model summary")

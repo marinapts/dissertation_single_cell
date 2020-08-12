@@ -26,6 +26,8 @@ sc.settings._vector_friendly = False
 sc.settings.autosave = True
 sc.settings.autoshow = False
 sc.settings._frameon = False
+sc.settings.fontsize = 24
+sc.settings.dpi_save = 300
 
 vmin = -5
 vmax = 5
@@ -35,11 +37,12 @@ use_raw = False
 celltypes = ['Neural Progenitors', 'Intermediate Progenitors', 'Post-mitotic Neurons', 'Ectopic', 'Unknown']
 
 
-def get_all_data(dataset, n_clusters):
+def get_all_data(dataset, n_clusters, n_bottleneck_size):
     adata = sc.read(Path('ann_data', dataset + '_genes.h5ad'))
     # bottleneck = pd.read_csv(Path('scDeepCluster/bottleneck', dataset + '_bottleneck.csv'), header=None)
     num_cl = str(n_clusters) if len(str(n_clusters)) == 2 else '0' + str(n_clusters)
-    bottleneck = pd.read_csv(Path('scDeepCluster/bottleneck', num_cl + '_clusters_' + dataset + '_bottleneck.csv'), header=None)
+    # bottleneck = pd.read_csv(Path('scDeepCluster/bottleneck', num_cl + '_clusters_' + dataset + '_bottleneck.csv'), header=None)
+    bottleneck = pd.read_csv(Path('scDeepCluster/bottleneck/bottleneck_size/bottleneck_' + n_bottleneck_size + '.csv'), header=None)
     return adata, bottleneck
 
 
@@ -107,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--top_n_genes', type=int, default=100)
     parser.add_argument('--n_clusters', type=int, default=10, help='n_clusters for K-Means')
     parser.add_argument('--fig_dir', type=str, default='./figures/bottleneck/')
+    parser.add_argument('--bottleneck_size', type=str, default='32', help='The size of the bottleneck')
     parser.add_argument('--write_to_file', action='store_true', help='Write bottleneck AnnData to h5ad file')
     args = parser.parse_args()
 
@@ -123,7 +127,7 @@ if __name__ == '__main__':
 
         # One of: E1*_hom_variable, E1*_hom_all, integration_variable, integration_all (where * is 3 or 4)
         dataset_with_type = dataset + '_' + args.dataset_type
-        adata, bottleneck = get_all_data(dataset_with_type, args.n_clusters)
+        adata, bottleneck = get_all_data(dataset_with_type, args.n_clusters, args.bottleneck_size)
 
         umap_embedding = fit_umap(bottleneck, n_neighbors=args.n_neighbors, min_dist=args.min_dist)
 
@@ -156,7 +160,7 @@ if __name__ == '__main__':
         print('adata', adata)
         print('bn', bn)
 
-        sc.pl.umap(bn, color='kmeans', title='Initial Clustering', save=DATASET_NAME + '_kmeans', legend_loc='on data')
+        sc.pl.umap(bn, color='kmeans', title='Initial Clustering', save=DATASET_NAME + '_kmeans', legend_loc='on data', legend_fontweight='heavy')
 
         marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
         # marker_genes, main_cell_types, available_ectopic = get_updated_marker_genes(adata)
@@ -200,8 +204,11 @@ if __name__ == '__main__':
         #       ANNOTATION - might bot be needed the annotation in the bottleneck
         # ==========================================================================
         bn.obs['bottleneck_annotations'] = annotate_clusters_based_on_overlap(gene_overlap_norm, bn, clusters_key='kmeans')
-        sc.pl.umap(bn, color='leiden_annotations', title='E14_hom annotations', save=DATASET_NAME + '_leiden_annotations')
-        sc.pl.umap(bn, color='bottleneck_annotations', title='Bottleneck annotations', save=DATASET_NAME + '_bottleneck_annotations')
+
+        n_bottleneck = args.bottleneck_size[-1] if args.bottleneck_size.startswith('0') else args.bottleneck_size
+        sc.pl.umap(bn, color='leiden_annotations', title='', save=DATASET_NAME + '_leiden_annotations', legend_loc=None,
+                   legend_fontweight='black', legend_fontsize='xx-large')
+        sc.pl.umap(bn, color='bottleneck_annotations', title='Bottleneck annotations', save=DATASET_NAME + '_bottleneck_annotations', legend_fontweight='heavy')
         # sc.pl.umap(bn, color=['leiden_annotations', 'bottleneck_annotations'],
         #            title=['E14_hom annotations', 'Bottleneck annotations'], save=DATASET_NAME + '_both_annotations')
 

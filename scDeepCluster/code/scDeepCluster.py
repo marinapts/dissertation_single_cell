@@ -37,10 +37,11 @@ DispAct = lambda x: tf.clip_by_value(tf.nn.softplus(x), 1e-4, 1e4)
 
 def map_labels_to_nums(labels):
     mapping = {
-        'Neural progenitors': 1,
-        'Intermediate progenitors': 2,
-        'Post-mitotic neurons': 3,
-        'Ectopic cells': 4
+        'Neural Progenitors': 1,
+        'Intermediate Progenitors': 2,
+        'Post-mitotic Neurons': 3,
+        'Ectopic': 4,
+        'Unknown': 5
     }
     num_labels = list()
 
@@ -361,6 +362,7 @@ if __name__ == "__main__":
     parser.add_argument('--ae_weights', default=None)
     parser.add_argument('--save_dir', default='results/scDeepCluster')
     parser.add_argument('--ae_weight_file', default='ae_weights.h5')
+    parser.add_argument('--bottleneck_size', default=32)
 
     args = parser.parse_args()
 
@@ -408,7 +410,7 @@ if __name__ == "__main__":
     print(args)
 
     # Define scDeepCluster model
-    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 32], n_clusters=args.n_clusters, noise_sd=2.5, debug=True)
+    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 128, 64, 32, 16, 8, int(args.bottleneck_size)], n_clusters=args.n_clusters, noise_sd=2.5, debug=True)
     # plot_model(scDeepCluster.model, to_file='scDeepCluster_model.png', show_shapes=True)
     print("autocoder summary")
     scDeepCluster.autoencoder.summary()

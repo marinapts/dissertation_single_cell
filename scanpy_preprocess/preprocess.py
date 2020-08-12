@@ -146,7 +146,6 @@ def clustering(adata, dataset, keep_only_highly_variable):
     sc.pp.neighbors(adata, n_neighbors=50, n_pcs=40)
     sc.tl.leiden(adata)
     sc.tl.umap(adata, min_dist=0.5)
-    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', save='_leiden_' + DATASET_NAME)
 
     # Remove Cajal Retzius cells
     if dataset == 'E14_hom':
@@ -159,6 +158,7 @@ def clustering(adata, dataset, keep_only_highly_variable):
         cluster = '11'
 
     adata = adata[~adata.obs['leiden'].isin([cluster]), :]
+    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', save='_leiden_' + DATASET_NAME)
     # adata.raw = adata.copy()
     return adata
 
