@@ -26,7 +26,8 @@ use_raw = False
 
 
 def plot_clusters(adata, clusters_key, is_integrated_dataset, main_cell_types, available_ectopic):
-    sc.pl.umap(adata, color=[clusters_key], legend_loc='on data', save=DATASET_NAME, title='Leiden clusters')
+    # sc.pl.umap(adata, color=[clusters_key], legend_loc='on data', save=DATASET_NAME, title='Leiden clusters')
+    sc.pl.umap(adata, color=[clusters_key], save=DATASET_NAME, title='Leiden clusters')
     if is_integrated_dataset is True:
         sc.pl.umap(adata, color=['batch'], save='_batch_' + DATASET_NAME, title='Leiden clusters')
 
@@ -88,7 +89,9 @@ if __name__ == '__main__':
         filepath = Path('ann_data/', data_filename + '.h5ad')
         adata = sc.read(filepath)
         print(adata)
-        clusters_key = 'integr_clusters' if is_integrated_dataset else 'leiden'
+
+        # clusters_key = 'integr_clusters' if is_integrated_dataset else 'leiden'
+        clusters_key = 'integr_clusters' if is_integrated_dataset else 'predictions'
 
         marker_genes, main_cell_types, available_ectopic = get_known_marker_genes(adata)
         if (dataset == 'E13_hom' and args.dataset_type == 'variable') or (dataset == 'integration'):
@@ -114,7 +117,7 @@ if __name__ == '__main__':
         # Write marker genes in a csv for annotation by SCSA
         groups = ranked_genes['names'].dtype.names
         dat = pd.DataFrame({group + '_' + key[:1]: ranked_genes[key][group] for group in groups for key in ['names', 'logfoldchanges', 'scores', 'pvals']})
-        dat.to_csv('cellmarker/DE_' + data_filename + '.csv')
+        dat.to_csv('cellmarker/DE_' + data_filename + '_predictions.csv')
 
         # Get overlap of known marker genes with the marker genes found from DE
         gene_overlap_norm = marker_gene_overlap(adata, marker_genes, FIGDIR, DATASET_NAME)

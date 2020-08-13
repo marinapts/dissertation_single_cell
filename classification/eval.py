@@ -73,7 +73,8 @@ if __name__ == '__main__':
     # Percentage of predicted celltypes in E13
     celltypes_percentage(y_pred)
 
-    E13_var = sc.read('ann_data/E13_hom_variable_genes.h5ad')
+    E13_var_path = 'ann_data/E13_hom_variable_genes.h5ad'
+    E13_var = sc.read(E13_var_path)
     E13_var.obs['predictions'] = y_pred
     sc.pl.umap(E13_var, color=['leiden_annotations', 'predictions'], title=['Leiden annotations', 'RandomForest predictions'])
 
@@ -82,3 +83,7 @@ if __name__ == '__main__':
     decision_tree_clf = DecisionTreeClassifier(max_depth=6, random_state=MYSEED).fit(X, y)
     y_pred = decision_tree_clf.predict(X_test)
     celltypes_percentage(y_pred)
+
+    # Update E13 h5ad file
+    E13_var.write(E13_var_path)
+    print('{} file updated'.format(E13_var_path))

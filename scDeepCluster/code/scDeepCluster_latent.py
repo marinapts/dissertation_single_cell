@@ -233,7 +233,7 @@ if __name__ == "__main__":
     print(args)
 
     # Define scDeepCluster model
-    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 32], n_clusters=args.n_clusters, noise_sd=2.5)
+    scDeepCluster = SCDeepCluster(dims=[input_size, 256, 64, 16], n_clusters=args.n_clusters, noise_sd=2.5)
     print("autocoder summary")
     scDeepCluster.autoencoder.summary()
     print("model summary")
