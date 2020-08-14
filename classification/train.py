@@ -2,15 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scanpy as sc
 import pickle
-import pandas as pd
 from pathlib import Path
 from sklearn import svm
-from sklearn.model_selection import train_test_split, validation_curve, GridSearchCV
+from sklearn.model_selection import validation_curve, GridSearchCV
 from sklearn.metrics import classification_report, plot_confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import CategoricalNB
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
@@ -127,14 +125,15 @@ if __name__ == '__main__':
         }, {
             'clf': (DecisionTreeClassifier(max_depth=6, random_state=MYSEED),),
             'clf__criterion': ('gini', 'entropy'),
-            'clf__max_depth': (None, 4, 6, 8, 12),
-            'clf__min_samples_leaf': (1, 5, 10, 15, 20),
+            # 'clf__max_depth': (None, 4, 6, 8, 12),
+            # 'clf__min_samples_leaf': (1, 5, 10, 15, 20),
             'clf__class_weight': (None, 'balanced')
         }, {
             'clf': (LogisticRegression(max_iter=200, C=1, random_state=MYSEED),),
         },
     ]
-    grid = GridSearchCV(pipeline, param_grid=param_grid, n_jobs=-20, verbose=3, cv=3)
+    grid = GridSearchCV(pipeline, param_grid=param_grid, n_jobs=20, scoring=['f1_macro', 'accuracy'],
+                        refit='f1_macro', verbose=3, cv=3)
     grid.fit(X, y_encoded)
     print('The best model is ', grid.best_estimator_)
     print("The best parameters are %s with a score of %0.2f" % (grid.best_params_, grid.best_score_))

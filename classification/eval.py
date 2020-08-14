@@ -2,6 +2,9 @@ import numpy as np
 import scanpy as sc
 import pickle
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
@@ -48,11 +51,26 @@ def load_HOM_datasets(dataset_type='variable'):
     return X, annotations, X_test
 
 
-def celltypes_percentage(y):
-    for celltype in set(y):
+def plot_celltypes_percentage(y):
+    celltypes = ['Ectopic', 'Intermediate Progenitors', 'Neural Progenitors', 'Post-mitotic Neurons', 'Unknown']
+    percent_cells = []
+
+    for celltype in celltypes:
         n_pred = len(y)
         n_celltype = len(y[y == celltype])
-        print('{}: {}%'.format(celltype, round(n_celltype / n_pred, 2) * 100))
+        percent_cells.append(round(n_celltype / n_pred, 2) * 100)
+
+    d = {'celltype': celltypes, 'percent_cells': percent_cells}
+    df = pd.DataFrame(d)
+
+    ax = sns.barplot(data=df, x='celltype', y='percent_cells', dodge=False)
+    ax.set(xlabel='Cell types', ylabel='Percentage of cells in E13_mutant')
+    ax.set_title('Percentage of cells predicted in each cell type')
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=20)
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -63,7 +81,7 @@ if __name__ == '__main__':
     y_encoded = label_encoder.transform(y)
 
     # Load CV results from pickle file
-    with open('./classification/cv_results.pickle', 'rb') as handle:
+    with open('./classification/cv_results_f1score_accuracy.pickle', 'rb') as handle:
         grid_cv = pickle.load(handle)
         cv_results = pd.DataFrame(grid_cv.cv_results_)
 
@@ -71,7 +89,7 @@ if __name__ == '__main__':
     y_pred = label_encoder.inverse_transform(y_pred)
 
     # Percentage of predicted celltypes in E13
-    celltypes_percentage(y_pred)
+    plot_celltypes_percentage(y_pred)
 
     E13_var = sc.read('ann_data/E13_hom_variable_genes.h5ad')
     E13_var.obs['predictions'] = y_pred
@@ -81,4 +99,4 @@ if __name__ == '__main__':
     # Eval with DecisionTrees
     decision_tree_clf = DecisionTreeClassifier(max_depth=6, random_state=MYSEED).fit(X, y)
     y_pred = decision_tree_clf.predict(X_test)
-    celltypes_percentage(y_pred)
+    plot_celltypes_percentage(y_pred)
