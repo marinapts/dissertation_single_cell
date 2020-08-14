@@ -64,8 +64,10 @@ def plot_celltypes_percentage(y):
     df = pd.DataFrame(d)
 
     ax = sns.barplot(data=df, x='celltype', y='percent_cells', dodge=False)
-    ax.set(xlabel='Cell types', ylabel='Percentage of cells in E13_mutant')
-    ax.set_title('Percentage of cells predicted in each cell type')
+    ax.set_xlabel('Cell types', fontsize=14)
+    ax.set_ylabel('Percentage of cells in E13_mutant', fontsize=14)
+    ax.set_title('Percentage of cells predicted in each cell type', fontsize=17)
+    ax.tick_params(labelsize=13)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
     ax.set_xticklabels(ax.get_xticklabels(), rotation=20)
 
