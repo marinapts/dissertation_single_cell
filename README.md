@@ -1,6 +1,6 @@
 # Single-cell analysis
 
-Single-cell analysis pipeline to detect the ectopic cells that appear after inactivation of the Pax6 gene
+Single-cell analysis pipeline to detect ectopic cells that appear after inactivation of the Pax6 gene
 in the cerebral cortex of mouse embryos.
 
 We have gene expression values in single cells for the embryonic days E13 and E14 for controls and knockouts.
@@ -9,19 +9,19 @@ We have gene expression values in single cells for the embryonic days E13 and E1
 
 > Controls (*Heterozygous control*): `E13_het`, `E14_het`
 
-TODO list:
-- [x] Preprocessing
-- [x] Assign cell types
-- [x] Differential expression analysis
-- [x] scDeepCluster - AE
-- [ ] sci... variational AE
-
-
-## Pipeline
 
 ### Preprocessing
 Preprocess datasets that exist under the data directory. New h5ad files (all genes or only highly variable genes)
 are saved in *ann_data*. Run the bash script OR the python file directly by passing the arguments.
+
+Preprocessing includes the following steps:
+1. Quality control
+2. Normalisation
+3. Regression of unwanted variation (cell cycle)
+4. PCA
+5. UMAP
+6. Marker genes for 3 major cell types (Neural progenitors, Intermediate progenitors, Post-mitotic neuron) and ectopic
+
 
 ```console
 bash scripts/preprocess.sh
@@ -83,34 +83,6 @@ Creates the *custom_cell_marker_db.csv* cell marker file. To be used SCSA?
 cd cellmarker
 python SCSA.py -d whole.db -i DE_E14_hom_variable_genes.csv -s scanpy -E -f1.5 -p 0.05 -o result -m txt -g Mouse -k Brain -M custom_cell_marker_db.csv
 ```
-
-
-
-
-
-### Preprocessing using Scanpy
-`scanpy_preprocess/preprocess.ipynb`
-
-1. Quality control
-2. Normalisation
-3. Regression of unwanted variation (cell cycle)
-4. PCA
-5. UMAP
-6. Marker genes for 3 major cell types (Neural progenitors, Intermediate progenitors, Post-mitotic neuron)
-7. Ectopic marker genes
-
-Saves the preprocessed files in `ann_data/exp_04`
-
-### Differential expression analysis
-`scanpy_preprocess/marker_genes.ipynb`
-
-Find differentiably expressed genes between the clusters.
-
-### Cell type assignment
-RMarkdown: `preprocessing/assign_cell_types.R`
-
-Assign cell types to cells using the R package `cellassign` and use the annotations to plot the bottleneck of the
-scDeepCluster autoencoder.
 
 
 ### scDeepCluster
